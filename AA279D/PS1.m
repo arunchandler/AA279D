@@ -124,40 +124,40 @@ fprintf('  vz: %.15f\n', v_eci(3));
 
 %part c) - numerically propagate state (rv) including and excluidng J2
 tstart = 0.0;
-tint = 10.0;
-tend = s_d * 5;
+tint = 100.0;
+tend = s_d*50;
 
 %unperturbed
 options = odeset('RelTol', 1e-6, 'AbsTol', 1e-9);
-%[t_out, TDX_rv_out_unperturbed] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TDX1_rv_ECI, tint);
-[t_out, TDX_rv_out_unperturbed] = ode45(@compute_rates_rv_unperturbed, [tstart:tint:tend]', init_TDX1_rv_ECI, options);
+[t_out, TDX_rv_out_unperturbed] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TDX1_rv_ECI, tint);
+%[t_out, TDX_rv_out_unperturbed] = ode113(@compute_rates_rv_unperturbed, [tstart:tint:tend]', init_TDX1_rv_ECI, options);
 
 figure;
-plot3(TDX_rv_out_unperturbed(:,1), TDX_rv_out_unperturbed(:,2), TDX_rv_out_unperturbed(:,3));
-hold on;
-xlabel('X [m]');
-ylabel('Y [m]');
-zlabel('Z [m]');
-title('TDX Unperturbed Trajectory in ECI Frame');
-grid on;
-axis equal;
-[X, Y, Z] = sphere(50);  % Generate sphere points
-surf(Re * X, Re * Y, Re * Z, 'FaceColor', 'g', 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+tiledlayout(3,2);
+titles = {'X [m]', 'Y [m]', 'Z [m]', 'V_x [m/s]', 'V_y [m/s]', 'V_z [m/s]'};
+for i = 1:6
+    nexttile;
+    plot(t_out, TDX_rv_out_unperturbed(:,i), 'b');
+    xlabel('Time [s]');
+    ylabel(titles{i});
+    grid on;
+end
+sgtitle('TDX Unperturbed State in ECI Frame');
 
 %perturbed
-%[t_out, TDX_rv_out_perturbed] = ode4(@compute_rates_rv_perturbed, [tstart, tend]', init_TDX1_rv_ECI, tint);
-[t_out, TDX_rv_out_perturbed] = ode45(@compute_rates_rv_perturbed, [tstart:tint:tend]', init_TDX1_rv_ECI, options);
+[t_out, TDX_rv_out_perturbed] = ode4(@compute_rates_rv_perturbed, [tstart, tend]', init_TDX1_rv_ECI, tint);
+%[t_out, TDX_rv_out_perturbed] = ode113(@compute_rates_rv_perturbed, [tstart:tint:tend]', init_TDX1_rv_ECI, options);
 
 figure;
-plot3(TDX_rv_out_perturbed(:,1), TDX_rv_out_perturbed(:,2), TDX_rv_out_perturbed(:,3));
-hold on;
-xlabel('X [m]');
-ylabel('Y [m]');
-zlabel('Z [m]');
-title('TDX Perturbed Trajectory in ECI Frame');
-grid on;
-axis equal;
-surf(Re * X, Re * Y, Re * Z, 'FaceColor', 'g', 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+tiledlayout(3,2);
+for i = 1:6
+    nexttile;
+    plot(t_out, TDX_rv_out_perturbed(:,i), 'r');
+    xlabel('Time [s]');
+    ylabel(titles{i});
+    grid on;
+end
+sgtitle('TDX Perturbed State in ECI Frame');
 
 %part d) analytical Kepplerian propagation
 a = osc_elements(1);
@@ -174,122 +174,163 @@ for i = 1:n_steps
     rv_eci_matrix(i, :) = rv_eci';
 end
 
-position_differences = rv_eci_matrix(:, 1:3) - TDX_rv_out_unperturbed(:, 1:3);
-velocity_differences = rv_eci_matrix(:, 4:6) - TDX_rv_out_unperturbed(:, 4:6);
+pos_error_rtn = zeros(n_steps, 3);
+vel_error_rtn = zeros(n_steps, 3);
 
-figure;
-% Position differences
-subplot(2,1,1);
-plot(t_out, vecnorm(position_differences, 2, 2), 'b');
-xlabel('Time (s)');
-ylabel('Position Difference (m)');
-title('Position Difference Over Time');
-grid on;
-% Velocity differences
-subplot(2,1,2);
-plot(t_out, vecnorm(velocity_differences, 2, 2), 'r');
-xlabel('Time (s)');
-ylabel('Velocity Difference (m/s)');
-title('Velocity Difference Over Time');
-grid on;
+for i = 1:n_steps
+    r_ref = TDX_rv_out_unperturbed(i, 1:3)';
+    v_ref = TDX_rv_out_unperturbed(i, 4:6)';
 
-%part e) compute koe, ecc vector, angular momentum vector, specific mechanical energy from rv for all TDX out
-num_states = size(TDX_rv_out_unperturbed, 1);
-params = zeros(num_states, 13);
+    delta_r = (rv_eci_matrix(i, 1:3) - r_ref');
+    delta_v = (rv_eci_matrix(i, 4:6) - v_ref');
 
-for k = 1:num_states
-    params(k, :) = rv2oe(TDX_rv_out_unperturbed(k, :), mu);
+    [delta_rv_rtn, R_rtn2eci] = eci2rtn([r_ref;v_ref]);
+
+    [err_rv_rtn, R_rtn2eci] = eci2rtn([delta_r';delta_v']);
+
+    pos_error_rtn(i, :) = err_rv_rtn(1:3)';
+    vel_error_rtn(i, :) = err_rv_rtn(4:6)';
 end
 
-a = params(:, 1);
-e = params(:, 2);
-i = params(:, 3);
-RAAN = params(:, 4);
-omega = params(:, 5);
-nu = params(:, 6);
-energy = params(:, 7);
-h = params(:, 8:10);
-e_vec = params(:, 11:13);
-
-% 1. Plot Semi-major axis (a)
+% Plot RTN position error components
 figure;
-plot(1:num_states, a, 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('Semi-major axis (a) [km]');
-title('Semi-major axis vs Time');
+subplot(2,1,1);
+plot(t_out, pos_error_rtn(:,1), 'r', ...
+     t_out, pos_error_rtn(:,2), 'g', ...
+     t_out, pos_error_rtn(:,3), 'b');
+xlabel('Time (s)');
+ylabel('Position Error(m)');
+title('Position Error in RTN Frame');
+legend('Radial', 'Transverse', 'Normal');
+grid on;
 
-% 2. Plot Eccentricity (e)
+% Plot RTN velocity error components
+subplot(2,1,2);
+plot(t_out, vel_error_rtn(:,1), 'r', ...
+     t_out, vel_error_rtn(:,2), 'g', ...
+     t_out, vel_error_rtn(:,3), 'b');
+xlabel('Time (s)');
+ylabel('Velocity Error(m/s)');
+title('Velocity Error in RTN Frame');
+legend('Radial', 'Transverse', 'Normal');
+grid on;
+
+sgtitle('Analytical Keplerian vs Numerical Unperturbed');
+
+%part e) compute koe, ecc vector, angular momentum vector, specific mechanical energy from rv for all TDX out
+num_states = size(TDX_rv_out_perturbed, 1);
+params_perturbed = zeros(num_states, 12);
+params_unperturbed = zeros(num_states, 12);
+
+for k = 1:num_states
+    params_perturbed(k, :) = rv2oe(TDX_rv_out_perturbed(k, :), mu);
+    params_unperturbed(k, :) = rv2oe(TDX_rv_out_unperturbed(k, :), mu);
+end
+
+% Extract parameters
+a_p = params_perturbed(:, 1);
+e_p = params_perturbed(:, 2);
+i_p = params_perturbed(:, 3);
+RAAN_p = params_perturbed(:, 4);
+omega_p = params_perturbed(:, 5);
+nu_p = params_perturbed(:, 6);
+energy_p = params_perturbed(:, 7);
+h_p = params_perturbed(:, 8:10);
+e_vec_p = params_perturbed(:, 11:12);
+
+a_u = params_unperturbed(:, 1);
+e_u = params_unperturbed(:, 2);
+i_u = params_unperturbed(:, 3);
+RAAN_u = params_unperturbed(:, 4);
+omega_u = params_unperturbed(:, 5);
+nu_u = params_unperturbed(:, 6);
+energy_u = params_unperturbed(:, 7);
+h_u = params_unperturbed(:, 8:10);
+e_vec_u = params_unperturbed(:, 11:12);
+
+time_vec = [tstart:tint:tend];
+
+% 1. Semi-major axis
 figure;
-plot(1:num_states, e, 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('Eccentricity (e)');
+plot(time_vec, a_p, 'b', time_vec, a_u, 'b--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('Semi-major axis (a) [m]');
+title('Semi-major Axis vs Time');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([6.5e6 8e6]);
+
+% 2. Eccentricity
+figure;
+plot(time_vec, e_p, 'r', time_vec, e_u, 'r--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('Eccentricity (e)');
 title('Eccentricity vs Time');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([0 0.1]);
 
-% 3. Plot Inclination (i)
+% 3. Inclination
 figure;
-plot(1:num_states, i, 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('Inclination (i) [deg]');
+plot(time_vec, i_p, 'g', time_vec, i_u, 'g--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('Inclination (i) [rad]');
 title('Inclination vs Time');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([0 pi]);
 
-% 4. Plot RAAN (Right Ascension of Ascending Node)
+% 4. RAAN
 figure;
-plot(1:num_states, RAAN, 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('RAAN [deg]');
+plot(time_vec, RAAN_p, 'm', time_vec, RAAN_u, 'm--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('RAAN [rad]');
 title('RAAN vs Time');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([0 2*pi]);
 
-% 5. Plot Argument of Periapsis (omega)
+% 5. Argument of Periapsis
 figure;
-plot(1:num_states, omega, 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('Argument of Periapsis (ω) [deg]');
+plot(time_vec, omega_p, 'c', time_vec, omega_u, 'c--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('Argument of Periapsis (ω) [rad]');
 title('Argument of Periapsis vs Time');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([0 2*pi]);
 
-% 6. Plot True Anomaly (nu)
+% 6. True Anomaly
 figure;
-plot(1:num_states, nu, 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('True Anomaly (ν) [deg]');
+plot(time_vec, nu_p, 'k', time_vec, nu_u, 'k--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('True Anomaly (ν) [rad]');
 title('True Anomaly vs Time');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([0 2*pi]);
 
-%Energy
+% 7. Specific Mechanical Energy
 figure;
-plot(1:num_states, energy, 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('Energy (J)');
-title('Energy vs Time');
+plot(time_vec, energy_p, 'b', time_vec, energy_u, 'b--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('Specific Mechanical Energy [J/kg]');
+title('Specific Mechanical Energy vs Time');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([-4e7 -2e7]);
 
-%Angular Momentum (h)
+% 8. Angular Momentum Vector
 figure;
-subplot(3, 1, 1);
-plot(1:num_states, h(:, 1), 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('h_x');
-title('Angular Momentum (h_x) vs Time');
+subplot(3,1,1);
+plot(time_vec, h_p(:,1), 'r', time_vec, h_u(:,1), 'r--', 'LineWidth', 1.5);
+ylabel('h_x'); title('Angular Momentum Vector Components');
+legend('Perturbed', 'Unperturbed'); grid on;
 
-subplot(3, 1, 2);
-plot(1:num_states, h(:, 2), 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('h_y');
-title('Angular Momentum (h_y) vs Time');
+subplot(3,1,2);
+plot(time_vec, h_p(:,2), 'g', time_vec, h_u(:,2), 'g--', 'LineWidth', 1.5);
+ylabel('h_y'); legend('Perturbed', 'Unperturbed'); grid on;
 
-subplot(3, 1, 3);
-plot(1:num_states, h(:, 3), 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('h_z');
-title('Angular Momentum (h_z) vs Time');
+subplot(3,1,3);
+plot(time_vec, h_p(:,3), 'b', time_vec, h_u(:,3), 'b--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('h_z'); legend('Perturbed', 'Unperturbed'); grid on;
+ylim([-7e9 -6e9]);
 
-%Eccentricity Vector (e_vec)
+% 9. Eccentricity Vector Components
 figure;
-subplot(3, 1, 1);
-plot(1:num_states, e_vec(:, 1), 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('e_x');
-title('Eccentricity Vector (e_x) vs Time');
+subplot(3,1,1);
+plot(time_vec, e_vec_p(:,1), 'r', time_vec, e_vec_u(:,1), 'r--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('e_x'); title('Eccentricity Vector Components');
+legend('Perturbed', 'Unperturbed'); grid on;
+ylim([0 1e-2]);
 
-subplot(3, 1, 2);
-plot(1:num_states, e_vec(:, 2), 'LineWidth', 1.5);
-xlabel('Time Step');
-ylabel('e_y');
-title('Eccentricity Vector (e_y) vs Time');
+subplot(3,1,2);
+plot(time_vec, e_vec_p(:,2), 'g', time_vec, e_vec_u(:,2), 'g--', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('e_y'); legend('Perturbed', 'Unperturbed'); grid on;
+ylim([0 1e-2]);

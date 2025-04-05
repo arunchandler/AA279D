@@ -60,5 +60,13 @@ function params = rv2oe(X, mu)
         a = Inf;
     end
 
-    params = [a, e, i, RAAN, omega, nu, energy, h, e_vec];
+    % Rotation matrix from perifocal to inertial frame
+    R_p2i = [ cos(RAAN)*cos(omega) - sin(RAAN)*sin(omega)*cos(i), -cos(RAAN)*sin(omega) - sin(RAAN)*cos(omega)*cos(i), sin(RAAN)*sin(i);
+              sin(RAAN)*cos(omega) + cos(RAAN)*sin(omega)*cos(i), -sin(RAAN)*sin(omega) + cos(RAAN)*cos(omega)*cos(i), -cos(RAAN)*sin(i);
+              sin(omega)*sin(i),                                 cos(omega)*sin(i),                                  cos(i) ];
+
+    e_vec_perifocal = (R_p2i') .* e_vec;
+    e_vec_perifocal = e_vec_perifocal(1:2); % Only x and y components in perifocal frame
+
+    params = [a, e, i, RAAN, omega, nu, energy, h, e_vec_perifocal];
 end

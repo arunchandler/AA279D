@@ -3,8 +3,7 @@ function [rv_rtn, R_rtn2eci] = eci2rtn(rv_eci)
 % Inputs:
 %   rv_eci : 6x1 states vector in ECI frame [m] and [m/s]
 % Outputs:
-%   r_rtn : 3x1 position vector in RTN frame [m]
-%   v_rtn : 3x1 velocity vector in RTN frame [m/s]
+%   rv_rtn : 6x1 state vector in RTN frame [m] and [m/s]
 %   R_rtn2eci : 3x3 rotation matrix from RTN to ECI
 
 r_eci = rv_eci(1:3);
