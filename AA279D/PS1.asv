@@ -366,8 +366,6 @@ e_y = e_p.*sin(omega_p);
 
 TDX_oe_osculating = [u, e_x, e_y, RAAN_p];
 
-osc_elements_wu = [];
-
 [t_out, TDX_oe_mean_perturbed] = ode4(@compute_rates_osc_elements, [tstart, tend]', osc_elements, tint);
 
 figure; 
