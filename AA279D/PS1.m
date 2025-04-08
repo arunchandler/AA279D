@@ -1,5 +1,7 @@
 clc; clear; close all;
 
+%addpath('mean_osc');
+
 format long g;
 
 tol = 10e-10;
@@ -22,6 +24,12 @@ fprintf('Mean Motion (rev/day)  |  Semi-Major Axis (m)\n');
 fprintf('----------------------------------------------\n');
 for i = 1:length(mean_motions)
     fprintf('%10.6f         |  %f m\n', mean_motions(i), a_m(i));
+end
+
+T = 2 * pi ./ n_rad;  % Orbital period in seconds for each mean motion
+fprintf('\nOrbital Periods (seconds):\n');
+for i = 1:length(T)
+    fprintf('Period %d: %.2f s\n', i, T(i));
 end
 
 % calculating relative orbital elements
@@ -124,7 +132,7 @@ fprintf('  vz: %.15f\n', v_eci(3));
 
 %part c) - numerically propagate state (rv) including and excluidng J2
 tstart = 0.0;
-tint = 100.0;
+tint = 50.0;
 tend = s_d*50;
 
 %unperturbed
@@ -144,6 +152,18 @@ for i = 1:6
 end
 sgtitle('TDX Unperturbed State in ECI Frame');
 
+figure;
+tiledlayout(3,2);
+titles = {'X [m]', 'Y [m]', 'Z [m]', 'V_x [m/s]', 'V_y [m/s]', 'V_z [m/s]'};
+for i = 1:6
+    nexttile;
+    time_idx = t_out < 100000;  % Only plot for time < 10000 seconds
+    plot(t_out(time_idx), TDX_rv_out_unperturbed(time_idx, i), '-b', 'Marker', 'none');
+    xlabel('Time [s]');
+    ylabel(titles{i});
+    grid on;
+end
+sgtitle('TDX Unperturbed State in ECI Frame t<100000');
 %perturbed
 [t_out, TDX_rv_out_perturbed] = ode4(@compute_rates_rv_perturbed, [tstart, tend]', init_TDX1_rv_ECI, tint);
 %[t_out, TDX_rv_out_perturbed] = ode113(@compute_rates_rv_perturbed, [tstart:tint:tend]', init_TDX1_rv_ECI, options);
@@ -158,6 +178,8 @@ for i = 1:6
     grid on;
 end
 sgtitle('TDX Perturbed State in ECI Frame');
+
+
 
 %part d) analytical Kepplerian propagation
 a = osc_elements(1);
