@@ -1,6 +1,6 @@
 clc; clear; close all;
 
-%addpath('mean_osc');
+addpath('mean_osc');
 
 format long g;
 
