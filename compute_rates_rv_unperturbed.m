@@ -1,9 +1,9 @@
 % rates function for numerical integration for propagating rv state
 % unperturbed
 
-function [rv_dot] = compute_rates_rv_unperturbed(t, rv)
+function [rv_dot] = compute_rates_rv_unperturbed_ECI(t, rv)
 
-    mu = 3.986004418e14; % (m^3/s^2)
+    global mu;
     
     rv_dot = zeros(6,1);
     rv_dot(1:3) = rv(4:6);

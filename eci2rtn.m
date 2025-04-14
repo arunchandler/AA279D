@@ -1,31 +1,60 @@
-function [rv_rtn, R_rtn2eci] = eci2rtn(rv_eci)
-% Convert from ECI frame to RTN frame
-% Inputs:
-%   rv_eci : 6x1 states vector in ECI frame [m] and [m/s]
-% Outputs:
-%   rv_rtn : 6x1 state vector in RTN frame [m] and [m/s]
-%   R_rtn2eci : 3x3 rotation matrix from RTN to ECI
+function [state_rtn, R_eci2rtn] = eci2rtn(chief_state, deputy_state)
+% eci2rtn Transform deputy satellite state from ECI to the chief's RTN frame.
+%
+%   state_rtn = eci2rtn(chief_state, deputy_state) converts the deputy's state 
+%   (position and velocity) from the Earth-Centered Inertial (ECI) frame to the 
+%   Radial-Transverse-Normal (RTN) frame of the chief satellite.
+%
+%   Inputs:
+%       chief_state  - 6x1 vector [r_c; v_c] where:
+%                        r_c: 3x1 position vector in ECI (e.g., in km)
+%                        v_c: 3x1 velocity vector in ECI (e.g., in km/s)
+%       deputy_state - 6x1 vector [r_d; v_d] with similar structure for the deputy.
+%
+%   Output:
+%       state_rtn - 6x1 vector [r_rtn; v_rtn] where:
+%                     r_rtn: 3x1 relative position of the deputy expressed in the 
+%                            chief's RTN frame.
+%                     v_rtn: 3x1 relative velocity of the deputy in the RTN frame,
+%                            which includes the correction for the rotating frame.
+%
+%   The RTN frame is defined as:
+%       R = r_c / ||r_c|| (Radial direction)
+%       N = (r_c x v_c) / ||r_c x v_c|| (Normal to the orbit)
+%       T = N x R (Transverse direction)
 
-r_eci = rv_eci(1:3);
-v_eci = rv_eci(4:6);
-
-R_hat = r_eci / norm(r_eci);
-
-h = cross(r_eci, v_eci);
-N_hat = h / norm(h);
-
-T_hat = cross(N_hat, R_hat);
-
-% Assemble the RTN-to-ECI rotation matrix
-R_rtn2eci = [R_hat, T_hat, N_hat];
-
-% Invert to get ECI-to-RTN transformation
-R_eci2rtn = R_rtn2eci';
-
-% Transform the vectors
-r_rtn = R_eci2rtn * r_eci;
-v_rtn = R_eci2rtn * v_eci;
-
-rv_rtn = [r_rtn; v_rtn];
-
+    % Chief
+    rC = chief_state(1:3);
+    vC = chief_state(4:6);
+    
+    % Deputy
+    rD = deputy_state(1:3);
+    vD = deputy_state(4:6);
+    
+    %chief's RTN coordinate system
+    R_vec = rC / norm(rC);
+    N_vec = cross(rC, vC);
+    N_vec = N_vec / norm(N_vec);
+    T_vec = cross(N_vec, R_vec);
+    
+    %Rotation matrix
+    C = [R_vec'; T_vec'; N_vec'];
+    
+    dr = rD - rC;
+    dv = vD - vC;
+    
+    r_rtn = C * dr;
+    
+    % Compute the angular velocity of the chief's orbit
+    h = cross(rC, vC);
+    omega_inertial = h / (norm(rC)^2);
+    
+    % Express the angular velocity in the RTN frame.
+    omega_rtn = C * omega_inertial;
+    
+    % Transform the relative velocity to the RTN frame
+    v_rtn = C * dv - cross(omega_rtn, r_rtn);
+    
+    state_rtn = [r_rtn; v_rtn];
+    R_eci2rtn = C;
 end

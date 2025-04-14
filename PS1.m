@@ -133,8 +133,8 @@ fprintf('  vz: %.15f\n', v_eci(3));
 
 %part c) - numerically propagate state (rv) including and excluidng J2
 tstart = 0.0;
-tint = 50.0;
-tend = s_d*50;
+tint = 10.0;
+tend = s_d*1;
 
 %unperturbed
 options = odeset('RelTol', 1e-6, 'AbsTol', 1e-9);
@@ -204,39 +204,77 @@ for i = 1:n_steps
     r_ref = TDX_rv_out_unperturbed(i, 1:3)';
     v_ref = TDX_rv_out_unperturbed(i, 4:6)';
 
-    delta_r = (rv_eci_matrix(i, 1:3) - r_ref');
-    delta_v = (rv_eci_matrix(i, 4:6) - v_ref');
+    rv_true_eci = rv_eci_matrix(i, :)';
 
-    [delta_rv_rtn, R_rtn2eci] = eci2rtn([r_ref;v_ref]);
+    [delta_rv_rtn, R_eci2rtn] = eci2rtn(rv_true_eci, [r_ref;v_ref]);
 
-    [err_rv_rtn, R_rtn2eci] = eci2rtn([delta_r';delta_v']);
-
-    pos_error_rtn(i, :) = err_rv_rtn(1:3)';
-    vel_error_rtn(i, :) = err_rv_rtn(4:6)';
+    pos_error_rtn(i, :) = delta_rv_rtn(1:3)';
+    vel_error_rtn(i, :) = delta_rv_rtn(4:6)';
 end
 
-% Plot RTN position error components
 figure;
-subplot(2,1,1);
-plot(t_out, pos_error_rtn(:,1), 'r', ...
-     t_out, pos_error_rtn(:,2), 'g', ...
-     t_out, pos_error_rtn(:,3), 'b');
+hold on;
+grid on;
+axis equal;
+
+% Numerical (unperturbed) trajectory
+plot3(TDX_rv_out_unperturbed(:,1), TDX_rv_out_unperturbed(:,2), TDX_rv_out_unperturbed(:,3), ...
+    'b');
+
+% Analytical Keplerian propagation
+plot3(rv_eci_matrix(:,1), rv_eci_matrix(:,2), rv_eci_matrix(:,3), ...
+    'r--');
+
+xlabel('X [m]');
+ylabel('Y [m]');
+zlabel('Z [m]');
+title('3D Orbit Trajectories: Numerical (ODE) vs Analytical (Keplerian)');
+legend('Numerical Propagation (Unperturbed)', 'Analytical Keplerian');
+
+figure;
+
+% R Position Error
+subplot(2,3,1);
+plot(t_out, pos_error_rtn(:,1), 'r');
 xlabel('Time [s]');
-ylabel('Position Error [m]');
-title('Position Error in RTN Frame');
-legend('Radial', 'Transverse', 'Normal');
+ylabel('R Position Error [m]');
 grid on;
 
-% Plot RTN velocity error components
-subplot(2,1,2);
-plot(t_out, vel_error_rtn(:,1), 'r', ...
-     t_out, vel_error_rtn(:,2), 'g', ...
-     t_out, vel_error_rtn(:,3), 'b');
+% T Position Error
+subplot(2,3,2);
+plot(t_out, pos_error_rtn(:,2), 'g');
 xlabel('Time [s]');
-ylabel('Velocity Error [m/s]');
-title('Velocity Error in RTN Frame');
-legend('Radial', 'Transverse', 'Normal');
+ylabel('T Position Error [m]');
 grid on;
+
+% N Position Error
+subplot(2,3,3);
+plot(t_out, pos_error_rtn(:,3), 'b');
+xlabel('Time [s]');
+ylabel('N Position Error [m]');
+grid on;
+
+% vR Velocity Error
+subplot(2,3,4);
+plot(t_out, vel_error_rtn(:,1), 'r');
+xlabel('Time [s]');
+ylabel('R Velocity Error [m/s]');
+grid on;
+
+% vT Velocity Error
+subplot(2,3,5);
+plot(t_out, vel_error_rtn(:,2), 'g');
+xlabel('Time [s]');
+ylabel('T Velocity Error [m/s]');
+grid on;
+
+% vN Velocity Error
+subplot(2,3,6);
+plot(t_out, vel_error_rtn(:,3), 'b');
+xlabel('Time [s]');
+ylabel('N Velocity Error [m/s]');
+grid on;
+
 
 sgtitle('Analytical Keplerian vs Numerical Unperturbed');
 
