@@ -33,7 +33,7 @@ function [state_dot] = compute_rates_rv_rel_unperturbed_RTN(t, state)
 
     fact = -mu  / ((r_TSX_mag+x)^2+y^2+z^2)^(3/2);
 
-    R_dd = 2*theta_dot*y_dot + theta_ddot*y + theta_dot^2*x + (r_TSX_mag+x)*fact + mu/r_TSX_mag^2;
+    R_dd = 2*theta_dot*y_dot + theta_ddot*y + theta_dot^2*x + (r_TSX_mag+x)*fact + mu/r_TSX_mag^2; 
     T_dd = -2*theta_dot*x_dot - theta_ddot*x + theta_dot^2*y + y*fact;
     N_dd = z*fact;
 
