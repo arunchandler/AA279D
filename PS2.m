@@ -11,6 +11,13 @@ J2 = 1.082626e-3;
 mu = 3.986004418e14; % (m^3/s^2)
 s_d = 86400; % seconds per day
 
+tstart = 0.0;
+tint = 1.0;
+tend = s_d*0.5;
+t_vec = [tstart:tint:tend];
+num_points = floor((tend-tstart)/tint) + 1;
+
+
 %% Part a) 
 
 a_TSX_2 = 6886536.686;  % m
@@ -35,10 +42,12 @@ init_TDX_koe = [a_TDX_2, e_TDX_2, i_TDX_2, RAAN_TDX_2, omega_TDX_2, M_TDX_2];
 init_TSX_rv_ECI = oe2rv(init_TSX_koe, mu);
 init_TDX_rv_ECI = oe2rv(init_TDX_koe, mu);
 
+n = sqrt(mu/a_TSX_2^3);
+T = 2*pi/n;
+
+t_out_orbit = t_vec / T;
+
 %% Part b) numerical integration of nonlinear equations of relative motion
-tstart = 0.0;
-tint = 1.0;
-tend = s_d*0.5;
 
 [init_TDX_rv_RTN,~] = eci2rtn(init_TSX_rv_ECI, init_TDX_rv_ECI);
 r0_init = init_TSX_rv_ECI;
@@ -50,42 +59,64 @@ init_state = [init_TDX_rv_RTN; r0_init];
 figure;
 sgtitle('Relative Position & Velocity');
 subplot(2,3,1)
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,1));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,1));
+xlabel('Orbits');
 ylabel('R Position [m]');
 grid on;
 
 subplot(2,3,2)
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,2));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,2));
+xlabel('Orbits');
 ylabel('T Position [m]');
 grid on;
 
 subplot(2,3,3)
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,3));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,3));
+xlabel('Orbits');
 ylabel('N Position [m]');
 grid on;
 
 subplot(2, 3, 4)
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:, 4));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:, 4));
+xlabel('Orbits');
 ylabel('R Velocity [m/s]');
 grid on;
 
 subplot(2, 3, 5)
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:, 5));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:, 5));
+xlabel('Orbits');
 ylabel('T Velocity [m/s]');
 grid on;
 
 subplot(2, 3, 6)
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:, 6));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:, 6));
+xlabel('Orbits');
 ylabel('N Velocity [m/s]');
 grid on;
 
 figure;
+subplot(2,2,1);
+plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2));
+grid on;
+axis equal;
+xlabel('R Position [m]');
+ylabel('T Position [m]');
+
+subplot(2,2,2);
+plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,3));
+grid on;
+axis equal;
+xlabel('R Position [m]');
+ylabel('N Position [m]');
+
+subplot(2,2,3);
+plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
+grid on;
+axis equal;
+xlabel('T Position [m]');
+ylabel('N Position [m]');
+
+subplot(2,2,4)
 plot3(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
 hold on;
 scatter3(0, 0, 0, 100, 'Marker', '.');
@@ -95,15 +126,13 @@ xlabel('R Position [m]');
 ylabel('T Position [m]');
 zlabel('N Position [m]');
 legend('TDX Position', 'TSX Position')
-title('3D Relative Orbit of TDX in TSX''s RTN Frame');
-
+sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
 
 %% Part c) compute relative orbit with fundamental diff eq
 
 [t_out, TSX_rv_out_unperturbed] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TSX_rv_ECI, tint);
 [t_out, TDX_rv_out_unperturbed] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TDX_rv_ECI, tint);
 
-num_points = size(TSX_rv_out_unperturbed, 1);
 TDX_rv_RTN = zeros(num_points, 6);
 
 for idx = 1:num_points
@@ -115,63 +144,92 @@ end
 figure;
 sgtitle('Relative Position & Velocity Comparison');
 subplot(2,3,1)
-plot(t_out, TDX_rv_RTN(:,1));
+plot(t_out_orbit, TDX_rv_RTN(:,1));
 hold on;
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,1));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,1));
+xlabel('Orbits');
 ylabel('R Position [m]');
 legend('Fundamental Differential Eq.', 'Relative Nonlinear Eq.');
 grid on;
 
 subplot(2,3,2)
-plot(t_out, TDX_rv_RTN(:,2));
+plot(t_out_orbit, TDX_rv_RTN(:,2));
 hold on;
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,2));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,2));
+xlabel('Orbits');
 ylabel('T Position [m]');
 legend('Fundamental Differential Eq.', 'Relative Nonlinear Eq.');
 grid on;
 
 subplot(2,3,3)
-plot(t_out, TDX_rv_RTN(:,3));
+plot(t_out_orbit, TDX_rv_RTN(:,3));
 hold on;
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,3));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,3));
+xlabel('Orbits');
 legend('Fundamental Differential Eq.', 'Relative Nonlinear Eq.');
 ylabel('N Position [m]');
 grid on;
 
 subplot(2,3,4)
-plot(t_out, TDX_rv_RTN(:,4));
+plot(t_out_orbit, TDX_rv_RTN(:,4));
 hold on;
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,4));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,4));
+xlabel('Orbits');
 ylabel('R Velocity [m/s]');
 legend('Fundamental Differential Eq.', 'Relative Nonlinear Eq.');
 grid on;
 
 subplot(2,3,5)
-plot(t_out, TDX_rv_RTN(:,5));
+plot(t_out_orbit, TDX_rv_RTN(:,5));
 hold on;
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,5));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,5));
+xlabel('Orbits');
 ylabel('T Velocity [m/s]');
 legend('Fundamental Differential Eq.', 'Relative Nonlinear Eq.');
 grid on;
 
 subplot(2,3,6)
-plot(t_out, TDX_rv_RTN(:,6));
+plot(t_out_orbit, TDX_rv_RTN(:,6));
 hold on;
-plot(t_out, TDX_rv_out_unperturbed_nonlin(:,6));
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,6));
+xlabel('Orbits');
 ylabel('N Velocity [m/s]');
 legend('Fundamental Differential Eq.', 'Relative Nonlinear Eq.');
 grid on;
 
 figure;
+
+subplot(2,2,1);
+plot(TDX_rv_RTN(:,1), TDX_rv_RTN(:,2));
+hold on;
+plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2));
+grid on;
+axis equal;
+xlabel('R Position [m]');
+ylabel('T Position [m]');
+
+subplot(2,2,2);
+plot(TDX_rv_RTN(:,1), TDX_rv_RTN(:,3));
+hold on;
+plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,3));
+grid on;
+axis equal;
+xlabel('R Position [m]');
+ylabel('N Position [m]');
+
+subplot(2,2,3);
+plot(TDX_rv_RTN(:,2), TDX_rv_RTN(:,3));
+hold on;
+plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
+grid on;
+axis equal;
+xlabel('T Position [m]');
+ylabel('N Position [m]');
+
+subplot(2,2,4);
 plot3(TDX_rv_RTN(:,1), TDX_rv_RTN(:,2), TDX_rv_RTN(:,3));
 hold on;
-%plot3(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
+plot3(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
 scatter3(0, 0, 0, 100, 'Marker', '.');
 grid on;
 xlabel('R Position [m]');
@@ -179,7 +237,7 @@ ylabel('T Position [m]');
 zlabel('N Position [m]');
 axis equal;
 legend('TDX Position (fundamental diff eq.)', 'TDX Position (relative nonlin. eq.)', 'TSX Position')
-title('3D Relative Orbit of TDX in TSX''s RTN Frame');
+sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
 
 %% Part d) compare b and c
 
@@ -187,38 +245,38 @@ err_RTN = TDX_rv_out_unperturbed_nonlin(:, 1:6) - TDX_rv_RTN;
 
 figure;
 subplot(2,3,1)
-plot(t_out, err_RTN(:,1));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN(:,1));
+xlabel('Orbits');
 ylabel('Error in R Position [m]');
 grid on;
 
 subplot(2,3,2)
-plot(t_out, err_RTN(:,2));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN(:,2));
+xlabel('Orbits');
 ylabel('Error in T Position [m]');
 grid on;
 
 subplot(2,3,3)
-plot(t_out, err_RTN(:,3));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN(:,3));
+xlabel('Orbits');
 ylabel('Error in N Position [m]');
 grid on;
 
 subplot(2,3,4)
-plot(t_out, err_RTN(:,4));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN(:,4));
+xlabel('Orbits');
 ylabel('Error in R Velocity [m/s]');
 grid on;
 
 subplot(2,3,5)
-plot(t_out, err_RTN(:,5));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN(:,5));
+xlabel('Orbits');
 ylabel('Error in T Velocity [m/s]');
 grid on;
 
 subplot(2,3,6)
-plot(t_out, err_RTN(:,6));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN(:,6));
+xlabel('Orbits');
 ylabel('Error in N Velocity [m/s]');
 grid on;
 
@@ -247,10 +305,6 @@ init_TDX_koe_d = [a_TDX_2_d, e_TDX_2_d, i_TDX_2_d, RAAN_TDX_2_d, omega_TDX_2_d, 
 init_TSX_rv_ECI_d = oe2rv(init_TSX_koe_d, mu);
 init_TDX_rv_ECI_d = oe2rv(init_TDX_koe_d, mu);
 
-tstart = 0.0;
-tint = 1.0;
-tend = s_d*0.5;
-
 [init_TDX_rv_RTN_d,~] = eci2rtn(init_TSX_rv_ECI_d, init_TDX_rv_ECI_d);
 r0_init_d = init_TSX_rv_ECI_d;
 
@@ -263,7 +317,6 @@ init_state_d = [init_TDX_rv_RTN_d; r0_init_d];
 [t_out, TSX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TSX_rv_ECI_d, tint);
 [t_out, TDX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TDX_rv_ECI_d, tint);
 
-num_points = size(TSX_rv_out_unperturbed_d, 1);
 TDX_rv_RTN_d = zeros(num_points, 6);
 
 for idx = 1:num_points
@@ -276,38 +329,38 @@ err_RTN_d = TDX_rv_out_unperturbed_nonlin_d(:, 1:6) - TDX_rv_RTN_d;
 
 figure;
 subplot(2,3,1)
-plot(t_out, err_RTN_d(:,1));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN_d(:,1));
+xlabel('Orbits');
 ylabel('Error in R Position [m]');
 grid on;
 
 subplot(2,3,2)
-plot(t_out, err_RTN_d(:,2));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN_d(:,2));
+xlabel('Orbits');
 ylabel('Error in T Position [m]');
 grid on;
 
 subplot(2,3,3)
-plot(t_out, err_RTN_d(:,3));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN_d(:,3));
+xlabel('Orbits');
 ylabel('Error in N Position [m]');
 grid on;
 
 subplot(2,3,4)
-plot(t_out, err_RTN_d(:,4));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN_d(:,4));
+xlabel('Orbits');
 ylabel('Error in R Velocity [m/s]');
 grid on;
 
 subplot(2,3,5)
-plot(t_out, err_RTN_d(:,5));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN_d(:,5));
+xlabel('Orbits');
 ylabel('Error in T Velocity [m/s]');
 grid on;
 
 subplot(2,3,6)
-plot(t_out, err_RTN_d(:,6));
-xlabel('Time [s]');
+plot(t_out_orbit, err_RTN_d(:,6));
+xlabel('Orbits');
 ylabel('Error in N Velocity [m/s]');
 grid on;
 
