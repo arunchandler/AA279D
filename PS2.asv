@@ -57,7 +57,7 @@ init_state = [init_TDX_rv_RTN; r0_init];
 [t_out, TDX_rv_out_unperturbed_nonlin] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, tend]', init_state, tint);
 
 figure;
-%sgtitle('Relative Position & Velocity');
+sgtitle('Relative Position & Velocity');
 subplot(2,3,1)
 plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,1));
 xlabel('Orbits');
@@ -125,9 +125,8 @@ axis equal;
 xlabel('R Position [m]');
 ylabel('T Position [m]');
 zlabel('N Position [m]');
-%legend({'One','Two','Three','Four'},'FontSize',14)
-legend({'TDX Position', 'TSX Position'},'FontSize',8)
-%sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
+legend('TDX Position', 'TSX Position')
+sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
 
 %% Part c) compute relative orbit with fundamental diff eq
 
@@ -143,7 +142,7 @@ for idx = 1:num_points
 end
 
 figure;
-%sgtitle('Relative Position & Velocity Comparison');
+sgtitle('Relative Position & Velocity Comparison');
 subplot(2,3,1)
 plot(t_out_orbit, TDX_rv_RTN(:,1));
 hold on;
@@ -237,8 +236,8 @@ xlabel('R Position [m]');
 ylabel('T Position [m]');
 zlabel('N Position [m]');
 axis equal;
-legend({'TDX Position (fundamental diff eq.)', 'TDX Position (relative nonlin. eq.)', 'TSX Position'}, 'FontSize',8)
-%sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
+legend('TDX Position (fundamental diff eq.)', 'TDX Position (relative nonlin. eq.)', 'TSX Position')
+sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
 
 %% Part d) compare b and c
 
@@ -281,7 +280,7 @@ xlabel('Orbits');
 ylabel('Error in N Velocity [m/s]');
 grid on;
 
-%sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI');
+sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI');
 
 % part d) second piece with a non-zero difference in semi-major axis 
 a_TSX_2_d = 6886536.686;  % m
@@ -373,7 +372,7 @@ xlabel('Orbits');
 ylabel('Error in N Velocity [m/s]');
 grid on;
 
-%sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI with Semi-major Axis Offset');
+sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI with Semi-major Axis Offset');
 
 
 %% Part e) most fuel-efficient impulse maneuver by deputy - try integrating analytically the GVEs over a dv
