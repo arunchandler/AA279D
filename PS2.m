@@ -372,7 +372,6 @@ delta_a = a_TSX_2_d - a_TDX_2_d;
 
 d_v = (sqrt(mu)/(2*a_TSX_2_d^(3/2)))*delta_a;
 
-
 %% Part f) Apply maneuver by repeating b and adding discontinuity in the inertial velocity of deputy
 
 t_m = 2e4;
@@ -393,64 +392,67 @@ t_out_post = t_out_post(:);
 t_out_d_corrected = [t_out_pre; t_out_post(2:end)];
 TDX_rv_out_unperturbed_nonlin_d_corrected = [state_out_pre; state_out_post(2:end,:)];
 
+disp(size(t_out));
+disp(size(t_out_d_corrected));
+
 figure;
 sgtitle('Relative Position & Velocity Comparison (_d Case)');
 % R Position
 subplot(2,3,1)
-plot(t_out, TDX_rv_out_unperturbed_nonlin_d(:,1), 'b-', 'LineWidth',2);
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,1), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_d_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,1), 'r-','LineWidth',2);
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,1), 'r-','LineWidth',2);
+xlabel('Orbits');
 ylabel('R Position [m]');
 legend('No Maneuver', 'Corrected','Location','Best');
 grid on;
 
 % T Position
 subplot(2,3,2)
-plot(t_out, TDX_rv_out_unperturbed_nonlin_d(:,2), 'b-', 'LineWidth',2);
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,2), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_d_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,2), 'r-','LineWidth',2);
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,2), 'r-','LineWidth',2);
+xlabel('Orbits');
 ylabel('T Position [m]');
 legend('No Maneuver', 'Corrected','Location','Best');
 grid on;
 
 % N Position
 subplot(2,3,3)
-plot(t_out, TDX_rv_out_unperturbed_nonlin_d(:,3), 'b-', 'LineWidth',2);
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,3), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_d_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,3), 'r-','LineWidth',2);
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,3), 'r-','LineWidth',2);
+xlabel('Orbits');
 ylabel('N Position [m]');
 legend('No Maneuver', 'Corrected','Location','Best');
 grid on;
 
 % R Velocity
 subplot(2,3,4)
-plot(t_out, TDX_rv_out_unperturbed_nonlin_d(:,4), 'b-', 'LineWidth',2);
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,4), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_d_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,4), 'r-','LineWidth',2);
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,4), 'r-','LineWidth',2);
+xlabel('Orbits');
 ylabel('R Velocity [m/s]');
 legend('No Maneuver', 'Corrected','Location','Best');
 grid on;
 
 % T Velocity
 subplot(2,3,5)
-plot(t_out, TDX_rv_out_unperturbed_nonlin_d(:,5), 'b-', 'LineWidth',2);
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,5), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_d_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,5), 'r-','LineWidth',2);
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,5), 'r-','LineWidth',2);
+xlabel('Orbits');
 ylabel('T Velocity [m/s]');
 legend('No Maneuver', 'Corrected','Location','Best');
 grid on;
 
 % N Velocity
 subplot(2,3,6)
-plot(t_out, TDX_rv_out_unperturbed_nonlin_d(:,6), 'b-', 'LineWidth',2);
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,6), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_d_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,6), 'r-','LineWidth',2);
-xlabel('Time [s]');
+plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,6), 'r-','LineWidth',2);
+xlabel('Orbits');
 ylabel('N Velocity [m/s]');
 legend('No Maneuver', 'Corrected','Location','Best');
 grid on;
