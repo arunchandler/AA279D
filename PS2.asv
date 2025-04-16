@@ -57,7 +57,7 @@ init_state = [init_TDX_rv_RTN; r0_init];
 [t_out, TDX_rv_out_unperturbed_nonlin] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, tend]', init_state, tint);
 
 figure;
-sgtitle('Relative Position & Velocity');
+%sgtitle('Relative Position & Velocity');
 subplot(2,3,1)
 plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin(:,1));
 xlabel('Orbits');
@@ -96,25 +96,25 @@ grid on;
 
 figure;
 subplot(2,2,1);
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('T Position [m]');
-
-subplot(2,2,2);
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,3));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('N Position [m]');
-
-subplot(2,2,3);
-plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
+plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,1));
 grid on;
 axis equal;
 xlabel('T Position [m]');
-ylabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,2);
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,1));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,3);
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,2));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('T Position [m]');
 
 subplot(2,2,4)
 plot3(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
@@ -125,8 +125,9 @@ axis equal;
 xlabel('R Position [m]');
 ylabel('T Position [m]');
 zlabel('N Position [m]');
-legend('TDX Position', 'TSX Position')
-sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
+%legend({'One','Two','Three','Four'},'FontSize',14)
+legend({'TDX Position', 'TSX Position'},'FontSize',8)
+%title('3D Relative Orbit of TDX in TSX''s RTN Frame');
 
 %% Part c) compute relative orbit with fundamental diff eq
 
@@ -142,7 +143,7 @@ for idx = 1:num_points
 end
 
 figure;
-sgtitle('Relative Position & Velocity Comparison');
+%sgtitle('Relative Position & Velocity Comparison');
 subplot(2,3,1)
 plot(t_out_orbit, TDX_rv_RTN(:,1));
 hold on;
@@ -200,31 +201,31 @@ grid on;
 figure;
 
 subplot(2,2,1);
-plot(TDX_rv_RTN(:,1), TDX_rv_RTN(:,2));
+plot(TDX_rv_RTN(:,2), TDX_rv_RTN(:,1));
 hold on;
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('T Position [m]');
-
-subplot(2,2,2);
-plot(TDX_rv_RTN(:,1), TDX_rv_RTN(:,3));
-hold on;
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,3));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('N Position [m]');
-
-subplot(2,2,3);
-plot(TDX_rv_RTN(:,2), TDX_rv_RTN(:,3));
-hold on;
-plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
+plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,1));
 grid on;
 axis equal;
 xlabel('T Position [m]');
-ylabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,2);
+plot(TDX_rv_RTN(:,3), TDX_rv_RTN(:,1));
+hold on;
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,1));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,3);
+plot(TDX_rv_RTN(:,3), TDX_rv_RTN(:,2));
+hold on;
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,2));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('T Position [m]');
 
 subplot(2,2,4);
 plot3(TDX_rv_RTN(:,1), TDX_rv_RTN(:,2), TDX_rv_RTN(:,3));
@@ -236,8 +237,8 @@ xlabel('R Position [m]');
 ylabel('T Position [m]');
 zlabel('N Position [m]');
 axis equal;
-legend('TDX Position (fundamental diff eq.)', 'TDX Position (relative nonlin. eq.)', 'TSX Position')
-sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
+legend({'TDX Position (fundamental diff eq.)', 'TDX Position (relative nonlin. eq.)', 'TSX Position'}, 'FontSize',8)
+%sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
 
 %% Part d) compare b and c
 
@@ -280,7 +281,7 @@ xlabel('Orbits');
 ylabel('Error in N Velocity [m/s]');
 grid on;
 
-sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI');
+%sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI');
 
 % part d) second piece with a non-zero difference in semi-major axis 
 a_TSX_2_d = 6886536.686;  % m
@@ -317,11 +318,6 @@ init_state_d = [init_TDX_rv_RTN_d; r0_init_d];
 [t_out, TSX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TSX_rv_ECI_d, tint);
 [t_out, TDX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TDX_rv_ECI_d, tint);
 
-M0 = M_TDX_2_d;
-n_TDX = sqrt(mu/(a_TDX_2_d^3));
-M_arr = wrapTo2Pi(M0 + n_TDX*t_out);
-
-%loop through M_arr to find periapsis points
 
 
 
@@ -372,7 +368,7 @@ xlabel('Orbits');
 ylabel('Error in N Velocity [m/s]');
 grid on;
 
-sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI with Semi-major Axis Offset');
+%sgtitle('Error Comparison: Unperturbed Nonlinear Eq. vs. Differential ECI with Semi-major Axis Offset');
 
 
 %% Part e) most fuel-efficient impulse maneuver by deputy - try integrating analytically the GVEs over a dv
@@ -382,26 +378,44 @@ d_v = (sqrt(mu)/(2*a_TSX_2_d^(3/2)))*delta_a;
 
 %% Part f) Apply maneuver by repeating b and adding discontinuity in the inertial velocity of deputy
 
-t_m = 2e4;
+M0 = M_TDX_2_d;
+n_TDX = sqrt(mu/(a_TDX_2_d^3));
+M_arr = wrapTo2Pi(M0 + n_TDX*t_out);
 
-[t_out_pre, state_out_pre] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, t_m]', init_state_d, tint);
+%loop through M_arr to find periapsis points
+t_out = t_out(:);
 
+t_m_candidate = 2e4;
+
+indices_before = find(t_out <= t_m_candidate);
+
+[~, local_idx] = min(M_arr(indices_before));  
+idx_perigee = indices_before(local_idx);
+t_perigee = t_out(idx_perigee);
+
+T_orbit = 2*pi*sqrt(a_TSX_2_d^3/mu);
+
+n_orbits = 3;  
+t_m_new = t_perigee + n_orbits * T_orbit;
+
+fprintf('Chosen perigee time: %g seconds\n', t_perigee);
+fprintf('New maneuver time (after %d orbits): %g seconds\n', n_orbits, t_m_new);
+
+[t_out_pre, state_out_pre] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, t_m_new]', init_state_d, tint);
 t_out_pre = t_out_pre(:);
-
 state_at_tm = state_out_pre(end, :)';
+
 
 impulse_vector = [0; d_v; 0];
 state_at_tm(4:6) = state_at_tm(4:6) + impulse_vector;
 
-[t_out_post, state_out_post] = ode4(@compute_rates_rv_rel_unperturbed, [t_m, tend]', state_at_tm, tint);
 
+[t_out_post, state_out_post] = ode4(@compute_rates_rv_rel_unperturbed, [t_m_new, tend]', state_at_tm, tint);
 t_out_post = t_out_post(:);
+
 
 t_out_d_corrected = [t_out_pre; t_out_post(2:end)];
 TDX_rv_out_unperturbed_nonlin_d_corrected = [state_out_pre; state_out_post(2:end,:)];
-
-disp(size(t_out));
-disp(size(t_out_d_corrected));
 
 figure;
 sgtitle('Relative Position & Velocity Comparison (_d Case)');

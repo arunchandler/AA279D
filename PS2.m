@@ -96,25 +96,25 @@ grid on;
 
 figure;
 subplot(2,2,1);
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('T Position [m]');
-
-subplot(2,2,2);
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,3));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('N Position [m]');
-
-subplot(2,2,3);
-plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
+plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,1));
 grid on;
 axis equal;
 xlabel('T Position [m]');
-ylabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,2);
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,1));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,3);
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,2));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('T Position [m]');
 
 subplot(2,2,4)
 plot3(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
@@ -127,7 +127,7 @@ ylabel('T Position [m]');
 zlabel('N Position [m]');
 %legend({'One','Two','Three','Four'},'FontSize',14)
 legend({'TDX Position', 'TSX Position'},'FontSize',8)
-%sgtitle('3D Relative Orbit of TDX in TSX''s RTN Frame');
+%title('3D Relative Orbit of TDX in TSX''s RTN Frame');
 
 %% Part c) compute relative orbit with fundamental diff eq
 
@@ -201,31 +201,31 @@ grid on;
 figure;
 
 subplot(2,2,1);
-plot(TDX_rv_RTN(:,1), TDX_rv_RTN(:,2));
+plot(TDX_rv_RTN(:,2), TDX_rv_RTN(:,1));
 hold on;
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,2));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('T Position [m]');
-
-subplot(2,2,2);
-plot(TDX_rv_RTN(:,1), TDX_rv_RTN(:,3));
-hold on;
-plot(TDX_rv_out_unperturbed_nonlin(:,1), TDX_rv_out_unperturbed_nonlin(:,3));
-grid on;
-axis equal;
-xlabel('R Position [m]');
-ylabel('N Position [m]');
-
-subplot(2,2,3);
-plot(TDX_rv_RTN(:,2), TDX_rv_RTN(:,3));
-hold on;
-plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,3));
+plot(TDX_rv_out_unperturbed_nonlin(:,2), TDX_rv_out_unperturbed_nonlin(:,1));
 grid on;
 axis equal;
 xlabel('T Position [m]');
-ylabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,2);
+plot(TDX_rv_RTN(:,3), TDX_rv_RTN(:,1));
+hold on;
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,1));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('R Position [m]');
+
+subplot(2,2,3);
+plot(TDX_rv_RTN(:,3), TDX_rv_RTN(:,2));
+hold on;
+plot(TDX_rv_out_unperturbed_nonlin(:,3), TDX_rv_out_unperturbed_nonlin(:,2));
+grid on;
+axis equal;
+xlabel('N Position [m]');
+ylabel('T Position [m]');
 
 subplot(2,2,4);
 plot3(TDX_rv_RTN(:,1), TDX_rv_RTN(:,2), TDX_rv_RTN(:,3));
@@ -318,11 +318,6 @@ init_state_d = [init_TDX_rv_RTN_d; r0_init_d];
 [t_out, TSX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TSX_rv_ECI_d, tint);
 [t_out, TDX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TDX_rv_ECI_d, tint);
 
-M0 = M_TDX_2_d;
-n_TDX = sqrt(mu/(a_TDX_2_d^3));
-M_arr = wrapTo2Pi(M0 + n_TDX*t_out);
-
-%loop through M_arr to find periapsis points
 
 
 
@@ -383,34 +378,56 @@ d_v = (sqrt(mu)/(2*a_TSX_2_d^(3/2)))*delta_a;
 
 %% Part f) Apply maneuver by repeating b and adding discontinuity in the inertial velocity of deputy
 
-t_m = 2e4;
+M0 = M_TDX_2_d;
+n_TDX = sqrt(mu/(a_TDX_2_d^3));
+M_arr = wrapTo2Pi(M0 + n_TDX*t_out);
 
-[t_out_pre, state_out_pre] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, t_m]', init_state_d, tint);
+%loop through M_arr to find periapsis points
+t_out = t_out(:);
 
+t_m_candidate = 1e4;
+
+indices_before = find(t_out <= t_m_candidate);
+
+[~, local_idx] = min(M_arr(indices_before));  
+idx_perigee = indices_before(local_idx);
+t_perigee = t_out(idx_perigee);
+
+%T_orbit = 2*pi*sqrt(a_TSX_2_d^3/mu);
+
+n_orbits = 3;  
+t_m_new = t_perigee + n_orbits * T;
+
+fprintf('Chosen perigee time: %g seconds\n', t_perigee);
+fprintf('New maneuver time (after %d orbits): %g seconds\n', n_orbits, t_m_new);
+
+[t_out_pre, state_out_pre] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, t_m_new]', init_state_d, tint);
 t_out_pre = t_out_pre(:);
-
 state_at_tm = state_out_pre(end, :)';
+
 
 impulse_vector = [0; d_v; 0];
 state_at_tm(4:6) = state_at_tm(4:6) + impulse_vector;
 
-[t_out_post, state_out_post] = ode4(@compute_rates_rv_rel_unperturbed, [t_m, tend]', state_at_tm, tint);
 
+[t_out_post, state_out_post] = ode4(@compute_rates_rv_rel_unperturbed, [t_m_new, tend]', state_at_tm, tint);
 t_out_post = t_out_post(:);
+
 
 t_out_d_corrected = [t_out_pre; t_out_post(2:end)];
 TDX_rv_out_unperturbed_nonlin_d_corrected = [state_out_pre; state_out_post(2:end,:)];
 
-disp(size(t_out));
-disp(size(t_out_d_corrected));
+t_out_orbit_no_maneuver = t_out / T;
+t_out_orbit_corrected = t_out_d_corrected / T;
 
 figure;
-sgtitle('Relative Position & Velocity Comparison (_d Case)');
+%sgtitle('Relative Position & Velocity Comparison (_d Case)');
+
 % R Position
 subplot(2,3,1)
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,1), 'b-', 'LineWidth',2);
+plot(t_out_orbit_no_maneuver, TDX_rv_out_unperturbed_nonlin_d(:,1), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,1), 'r-','LineWidth',2);
+plot(t_out_orbit_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,1), 'r-', 'LineWidth',2);
 xlabel('Orbits');
 ylabel('R Position [m]');
 legend('No Maneuver', 'Corrected','Location','Best');
@@ -418,9 +435,9 @@ grid on;
 
 % T Position
 subplot(2,3,2)
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,2), 'b-', 'LineWidth',2);
+plot(t_out_orbit_no_maneuver, TDX_rv_out_unperturbed_nonlin_d(:,2), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,2), 'r-','LineWidth',2);
+plot(t_out_orbit_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,2), 'r-', 'LineWidth',2);
 xlabel('Orbits');
 ylabel('T Position [m]');
 legend('No Maneuver', 'Corrected','Location','Best');
@@ -428,9 +445,9 @@ grid on;
 
 % N Position
 subplot(2,3,3)
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,3), 'b-', 'LineWidth',2);
+plot(t_out_orbit_no_maneuver, TDX_rv_out_unperturbed_nonlin_d(:,3), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,3), 'r-','LineWidth',2);
+plot(t_out_orbit_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,3), 'r-', 'LineWidth',2);
 xlabel('Orbits');
 ylabel('N Position [m]');
 legend('No Maneuver', 'Corrected','Location','Best');
@@ -438,9 +455,9 @@ grid on;
 
 % R Velocity
 subplot(2,3,4)
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,4), 'b-', 'LineWidth',2);
+plot(t_out_orbit_no_maneuver, TDX_rv_out_unperturbed_nonlin_d(:,4), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,4), 'r-','LineWidth',2);
+plot(t_out_orbit_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,4), 'r-', 'LineWidth',2);
 xlabel('Orbits');
 ylabel('R Velocity [m/s]');
 legend('No Maneuver', 'Corrected','Location','Best');
@@ -448,9 +465,9 @@ grid on;
 
 % T Velocity
 subplot(2,3,5)
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,5), 'b-', 'LineWidth',2);
+plot(t_out_orbit_no_maneuver, TDX_rv_out_unperturbed_nonlin_d(:,5), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,5), 'r-','LineWidth',2);
+plot(t_out_orbit_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,5), 'r-', 'LineWidth',2);
 xlabel('Orbits');
 ylabel('T Velocity [m/s]');
 legend('No Maneuver', 'Corrected','Location','Best');
@@ -458,23 +475,32 @@ grid on;
 
 % N Velocity
 subplot(2,3,6)
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d(:,6), 'b-', 'LineWidth',2);
+plot(t_out_orbit_no_maneuver, TDX_rv_out_unperturbed_nonlin_d(:,6), 'b-', 'LineWidth',2);
 hold on;
-plot(t_out_orbit, TDX_rv_out_unperturbed_nonlin_d_corrected(:,6), 'r-','LineWidth',2);
+plot(t_out_orbit_corrected, TDX_rv_out_unperturbed_nonlin_d_corrected(:,6), 'r-', 'LineWidth',2);
 xlabel('Orbits');
 ylabel('N Velocity [m/s]');
 legend('No Maneuver', 'Corrected','Location','Best');
 grid on;
 
+
+burn_orbit = t_m_new / T;
+
+window = 0.2;  
+xlim_min = burn_orbit - window;
+xlim_max = burn_orbit + window;
+
+
 figure;
+
 plot3(TDX_rv_out_unperturbed_nonlin_d(:,1), TDX_rv_out_unperturbed_nonlin_d(:,2), TDX_rv_out_unperturbed_nonlin_d(:,3), 'b-', 'LineWidth', 2);
 hold on;
-plot3(TDX_rv_out_unperturbed_nonlin_d_corrected(:,1), TDX_rv_out_unperturbed_nonlin_d_corrected(:,2), TDX_rv_out_unperturbed_nonlin_d_corrected(:,3), 'r--', 'LineWidth', 2);
+plot3(TDX_rv_out_unperturbed_nonlin_d_corrected(:,1), TDX_rv_out_unperturbed_nonlin_d_corrected(:,2), TDX_rv_out_unperturbed_nonlin_d_corrected(:,3), 'r-', 'LineWidth', 2);
 scatter3(0, 0, 0, 100, 'k.', 'MarkerEdgeColor','k');  % Chief's position at origin
 grid on;
-axis equal;
+%axis equal;
 xlabel('R Position [m]');
 ylabel('T Position [m]');
 zlabel('N Position [m]');
-legend('No Maneuver', 'Corrected', 'Chief (TSX)', 'Location','Best');
-title('3D Relative Orbit of TDX in TSX''s RTN Frame');
+%title('3D Relative Orbit');
+legend({'Fundamental diff eq.', 'Corrected Simulation', 'Chief (TSX)'}, 'FontSize', 8);
