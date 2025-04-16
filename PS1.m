@@ -138,10 +138,16 @@ tend = s_d*1;
 num_points = floor((tend-tstart)/tint) + 1;
 t_vec = [tstart:tint:tend];
 
+t_end_extended = s_d*11;
+t_vec_extended = [tstart:tint:t_end_extended];
+
+
 n = sqrt(mu/a_TSX_1^3);
 T = 2*pi/n;
-
+fprintf('Orbit Period %.f\n', T);
 t_out_orbit = t_vec / T;
+
+t_out_orbit_ext = t_vec_extended / T;
 
 %unperturbed
 options = odeset('RelTol', 1e-6, 'AbsTol', 1e-9);
@@ -158,34 +164,21 @@ for i = 1:6
     ylabel(titles{i});
     grid on;
 end
-sgtitle('TDX Unperturbed State in ECI Frame');
 
-figure;
-tiledlayout(3,2);
-titles = {'X [m]', 'Y [m]', 'Z [m]', 'V_x [m/s]', 'V_y [m/s]', 'V_z [m/s]'};
-time_idx = t_out < 100000;  % Only plot for time < 10000 seconds
-for i = 1:6
-    nexttile;
-    plot(t_out_orbit(time_idx), TDX_rv_out_unperturbed(time_idx, i), '-b', 'Marker', 'none');
-    xlabel('Orbits');
-    ylabel(titles{i});
-    grid on;
-end
-sgtitle('TDX Unperturbed State in ECI Frame t<100000');
 %perturbed
-[t_out, TDX_rv_out_perturbed] = ode4(@compute_rates_rv_perturbed, [tstart, tend]', init_TDX1_rv_ECI, tint);
+[t_out_ext, TDX_rv_out_perturbed] = ode4(@compute_rates_rv_perturbed, [tstart, t_end_extended]', init_TDX1_rv_ECI, tint);
 %[t_out, TDX_rv_out_perturbed] = ode113(@compute_rates_rv_perturbed, [tstart:tint:tend]', init_TDX1_rv_ECI, options);
 
 figure;
 tiledlayout(3,2);
 for i = 1:6
     nexttile;
-    plot(t_out_orbit, TDX_rv_out_perturbed(:,i), 'r');
+    plot(t_out_orbit_ext, TDX_rv_out_perturbed(:,i), 'r');
     xlabel('Orbits');
     ylabel(titles{i});
     grid on;
 end
-sgtitle('TDX Perturbed State in ECI Frame');
+
 
 
 
@@ -235,7 +228,7 @@ plot3(rv_eci_matrix(:,1), rv_eci_matrix(:,2), rv_eci_matrix(:,3), ...
 xlabel('X [m]');
 ylabel('Y [m]');
 zlabel('Z [m]');
-title('3D Orbit Trajectories: Numerical (ODE) vs Analytical (Keplerian)');
+
 legend('Numerical Propagation (Unperturbed)', 'Analytical Keplerian');
 
 figure;
@@ -283,10 +276,9 @@ ylabel('N Velocity Error [m/s]');
 grid on;
 
 
-sgtitle('Analytical Keplerian vs Numerical Unperturbed');
 
 %part e) compute koe, ecc vector, angular momentum vector, specific mechanical energy from rv for all TDX out
-num_states = size(TDX_rv_out_perturbed, 1);
+num_states = size(TDX_rv_out_unperturbed, 1);
 params_perturbed = zeros(num_states, 12);
 params_unperturbed = zeros(num_states, 12);
 
@@ -320,121 +312,92 @@ time_vec = [tstart:tint:tend];
 
 % 1. Semi-major axis
 figure;
-plot(time_vec, a_p, 'b', time_vec, a_u, 'b--', 'LineWidth', 1.5);
+plot(t_out_orbit, a_p, 'b', t_out_orbit, a_u, 'b--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('Semi-major axis (a) [m]');
-title('Semi-major Axis vs Time');
+%title('Semi-major Axis vs Time');
 legend('Perturbed', 'Unperturbed'); grid on;
-ylim([6.5e6 7e6]);
+ylim([6.85e6 6.9e6]);
 
-% 1. Semi-major axis t<10000
-figure;
-plot(time_vec(time_idx), a_p(time_idx), 'b', time_vec(time_idx), a_u(time_idx), 'b--', 'LineWidth', 1.5);
-xlabel('Orbits'); ylabel('Semi-major axis (a) [m]');
-title('Semi-major Axis vs Time t<100000');
-legend('Perturbed', 'Unperturbed'); grid on;
-ylim([6.5e6 7e6]);
 
 % 2. Eccentricity
 figure;
-plot(time_vec, e_p, 'r', time_vec, e_u, 'r--', 'LineWidth', 1.5);
+plot(t_out_orbit, e_p, 'r', t_out_orbit, e_u, 'r--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('Eccentricity');
-title('Eccentricity vs Time');
+%title('Eccentricity vs Time');
 legend('Perturbed', 'Unperturbed'); grid on;
-ylim([0 0.01]);
+ylim([0 0.003]);
 
-% 2. Eccentricity t<10000
-figure;
-plot(time_vec(time_idx), e_p(time_idx), 'r', time_vec(time_idx), e_u(time_idx), 'r--', 'LineWidth', 1.5);
-xlabel('Orbits'); ylabel('Eccentricity');
-title('Eccentricity vs Time t<10000');
-legend('Perturbed', 'Unperturbed'); grid on;
-ylim([0 0.01]);
 
 % 3. Inclination
 figure;
-plot(time_vec, i_p, 'g', time_vec, i_u, 'g--', 'LineWidth', 1.5);
+plot(t_out_orbit, i_p, 'g', t_out_orbit, i_u, 'g--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('Inclination [rad]');
-title('Inclination vs Time');
+%title('Inclination vs Time');
 legend('Perturbed', 'Unperturbed'); grid on;
-ylim([0 pi]);
+ylim([1.7 1.702]);
 
 % 4. RAAN
 figure;
-plot(time_vec, RAAN_p, 'm', time_vec, RAAN_u, 'm--', 'LineWidth', 1.5);
+plot(t_out_orbit, RAAN_p, 'm', t_out_orbit, RAAN_u, 'm--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('RAAN [rad]');
-title('RAAN vs Time');
+%title('RAAN vs Time');
 legend('Perturbed', 'Unperturbed'); grid on;
-ylim([0 2*pi]);
+ylim([3 3.2]);
 
-% 5. Argument of Periapsis t<10000
+% 5. Argument of Periapsis
 figure;
-plot(time_vec(time_idx), omega_p(time_idx), 'c', time_vec(time_idx), omega_u(time_idx), 'c--', 'LineWidth', 1.5);
+plot(t_out_orbit, omega_p, 'c', t_out_orbit, omega_u, 'c--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('Argument of Periapsis [rad]');
-title('Argument of Periapsis vs Time t<10000');
+%title('Argument of Periapsis vs Time t<10000');
 legend('Perturbed', 'Unperturbed'); grid on;
 ylim([0 2*pi]);
 
 % 6. True Anomaly
 figure;
-plot(time_vec, nu_p, 'k', time_vec, nu_u, 'k--', 'LineWidth', 1.5);
+plot(t_out_orbit, nu_p, 'k', t_out_orbit, nu_u, 'k--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('True Anomaly [rad]');
-title('True Anomaly vs Time');
+%title('True Anomaly vs Time');
 legend('Perturbed', 'Unperturbed'); grid on;
 ylim([0 2*pi]);
 
-% 7. Specific Mechanical Energy t<10000
+% 7. Specific Mechanical Energy 
 figure;
-plot(time_vec(time_idx), energy_p(time_idx), 'b', time_vec(time_idx), energy_u(time_idx), 'b--', 'LineWidth', 1.5);
+plot(t_out_orbit, energy_p, 'b', t_out_orbit, energy_u, 'b--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('Specific Mechanical Energy [J/kg]');
-title('Specific Mechanical Energy vs Time');
+%title('Specific Mechanical Energy vs Time');
 legend('Perturbed', 'Unperturbed'); grid on;
-ylim([-3e7 -2.8e7]);
+ylim([-2.91e7 -2.89e7]);
 
 % 8. Angular Momentum Vector
 figure;
 subplot(3,1,1);
-plot(time_vec, h_p(:,1), 'r', time_vec, h_u(:,1), 'r--', 'LineWidth', 1.5);
-ylabel('h_x'); title('Angular Momentum Vector Components');
+plot(t_out_orbit, h_p(:,1), 'r', t_out_orbit, h_u(:,1), 'r--', 'LineWidth', 1.5);
+ylabel('h_x'); %title('Angular Momentum Vector Components');
 legend('Perturbed', 'Unperturbed'); grid on;
 
 subplot(3,1,2);
-plot(time_vec, h_p(:,2), 'g', time_vec, h_u(:,2), 'g--', 'LineWidth', 1.5);
+plot(t_out_orbit, h_p(:,2), 'g', t_out_orbit, h_u(:,2), 'g--', 'LineWidth', 1.5);
 ylabel('h_y'); legend('Perturbed', 'Unperturbed'); grid on;
 
 subplot(3,1,3);
-plot(time_vec, h_p(:,3), 'b', time_vec, h_u(:,3), 'b--', 'LineWidth', 1.5);
+plot(t_out_orbit, h_p(:,3), 'b', t_out_orbit, h_u(:,3), 'b--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('h_z'); legend('Perturbed', 'Unperturbed'); grid on;
 ylim([-7e9 -6e9]);
 
 % 9. Eccentricity Vector Components
 figure;
 subplot(2,1,1);
-plot(time_vec, e_vec_p(:,1), 'r', time_vec, e_vec_u(:,1), 'r--', 'LineWidth', 1.5);
-xlabel('Orbits'); ylabel('e_x'); title('Eccentricity Vector Components');
+plot(t_out_orbit, e_vec_p(:,1), 'r', t_out_orbit, e_vec_u(:,1), 'r--', 'LineWidth', 1.5);
+xlabel('Orbits'); ylabel('e_x'); %title('Eccentricity Vector Components');
 legend('Perturbed', 'Unperturbed'); grid on;
-ylim([-0.002 0.002]);
+ylim([-0.0005 0.0015]);
 
 subplot(2,1,2);
-plot(time_vec, e_vec_p(:,2), 'g', time_vec, e_vec_u(:,2), 'g--', 'LineWidth', 1.5);
+plot(t_out_orbit, e_vec_p(:,2), 'g', t_out_orbit, e_vec_u(:,2), 'g--', 'LineWidth', 1.5);
 xlabel('Orbits'); ylabel('e_y'); legend('Perturbed', 'Unperturbed'); grid on;
-ylim([-0.002 0.002]);
+ylim([-0.0015 0.0015]);
 
-% 9. Eccentricity Vector Components t<10000
-figure;
-subplot(2,1,1);
-ex_p_vec = e_vec_p(:,1);
-ex_u_vec = e_vec_u(:,1);
-ey_p_vec = e_vec_p(:,2);
-ey_u_vec = e_vec_u(:,2);
-plot(time_vec(time_idx), ex_p_vec(time_idx), 'r', time_vec(time_idx), ex_u_vec(time_idx), 'r--', 'LineWidth', 1.5);
-xlabel('Orbits'); ylabel('e_x'); title('Eccentricity Vector Components');
-legend('Perturbed', 'Unperturbed'); grid on;
-ylim([-0.002 0.002]);
 
-subplot(2,1,2);
-plot(time_vec(time_idx), ey_p_vec(time_idx), 'g', time_vec(time_idx), ey_u_vec(time_idx), 'g--', 'LineWidth', 1.5);
-xlabel('Orbits'); ylabel('e_y'); legend('Perturbed', 'Unperturbed'); grid on;
-ylim([-0.002 0.002]);
 
 % part f) propagating orbital elements from J2 effects
 
@@ -463,36 +426,6 @@ u_prop = TDX_osc_oe_propagated(:,6);
 figure;
 
 subplot(4,1,1)
-plot(t_out_orbit(time_idx), e_x_p(time_idx), 'b', t_out_orbit(time_idx), ex_prop(time_idx), 'r--')
-ylabel('e_x')
-legend('State Propagation', 'OE Propagation')
-grid on
-
-subplot(4,1,2)
-plot(t_out_orbit(time_idx), e_y_p(time_idx), 'b', t_out_orbit(time_idx), ey_prop(time_idx), 'r--')
-ylabel('e_y')
-legend('State Propagation', 'OE Propagation')
-grid on
-
-subplot(4,1,3)
-plot(t_out_orbit(time_idx), RAAN_p(time_idx), 'b', t_out_orbit(time_idx), RAAN_prop(time_idx), 'r--')
-ylabel('RAAN [rad]')
-legend('State Propagation', 'OE Propagation')
-grid on
-
-subplot(4,1,4)
-plot(t_out_orbit(time_idx), u_p(time_idx), 'b', t_out_orbit(time_idx), u_prop(time_idx), 'r--')
-ylabel('u [rad]')
-xlabel('Orbits')
-legend('State Propagation', 'OE Propagation')
-grid on
-
-sgtitle('Short Period State Propagation vs OE Propagation for J2 Effects')
-
-%long period
-figure;
-
-subplot(4,1,1)
 plot(t_out_orbit, e_x_p, 'b', t_out_orbit, ex_prop, 'r--')
 ylabel('e_x')
 legend('State Propagation', 'OE Propagation')
@@ -517,4 +450,6 @@ xlabel('Orbits')
 legend('State Propagation', 'OE Propagation')
 grid on
 
-sgtitle('Long Period State Propagation vs OE Propagation for J2 Effects')
+%sgtitle('Short Period State Propagation vs OE Propagation for J2 Effects')
+
+%long period
