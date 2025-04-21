@@ -278,3 +278,66 @@ t_grid  = linspace(0, n_orbit*T, 1000).';
 
 [r_RTN_lin, v_RTN_lin] = propagateLinearEcc(roe_qns, chief_oe, t_grid, tol);
 
+figure('Name','Relative Position Comparison','NumberTitle','off');
+
+% R‐component
+subplot(3,1,1)
+plot(t_orbit, r_RTN(:,1),'b--', 'DisplayName','YA'); hold on;
+plot(t_orbit, r_RTN_lin(:,1),'r-',  'DisplayName','Linear');
+ylabel('R [m]'); legend('Location','best'); grid on
+
+% T‐component
+subplot(3,1,2)
+plot(t_orbit, r_RTN(:,2),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,2),'r-');
+ylabel('T [m]'); grid on
+
+% N‐component
+subplot(3,1,3)
+plot(t_orbit, r_RTN(:,3),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('N [m]'); grid on
+
+
+figure('Name','Relative Velocity Comparison','NumberTitle','off');
+
+% Ṙ‐component
+subplot(3,1,1)
+plot(t_orbit, v_RTN(:,1),'b--','DisplayName','YA'); hold on;
+plot(t_orbit, v_RTN_lin(:,1),'r-','DisplayName','Linear');
+ylabel('Ṙ [m/s]'); legend('Location','best'); grid on
+
+% Ṫ‐component
+subplot(3,1,2)
+plot(t_orbit, v_RTN(:,2),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,2),'r-');
+ylabel('Ṫ [m/s]'); grid on
+
+% Ṅ‐component
+subplot(3,1,3)
+plot(t_orbit, v_RTN(:,3),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('Ṅ [m/s]'); grid on
+
+figure('Name','Relative Paths','NumberTitle','off');
+
+subplot(2,2,1)
+plot(r_RTN(:,2), r_RTN(:,1), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,1), 'r-')
+xlabel('T [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,2)
+plot(r_RTN(:,3), r_RTN(:,1), 'b--'); hold on; 
+plot(r_RTN_lin(:,3), r_RTN_lin(:,1), 'r-')
+xlabel('N [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,3)
+plot(r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('T [m]'), ylabel('N [m]'), grid on
+
+subplot(2,2,4)
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot3(r_RTN_lin(:,1), r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]')
+axis equal, grid on, view(3)
