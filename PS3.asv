@@ -252,29 +252,6 @@ axis equal, view(3), grid on
 da = (a_TDX_init_2 - a_TSX_init_2) / a_TSX_init_2;
 dlambda = (M_TDX_init_2 + omega_TDX_init_2) - (M_TSX_init_2 + omega_TSX_init_2) + (RAAN_TDX_init_2 - RAAN_TSX_init_2)*cos(i_TSX_init_2);
 de_x = e_TDX_init_2*cos(omega_TDX_init_2) - e_TSX_init_2*cos(omega_TSX_init_2);
-de_y = e_TDX_init_2*sin(omega_TDX_init_2) - e_TSX_init_2*sin(omega_TSX_init_2);
+de_y = e_TDX_init_2*sin(omega_TDX_init_2) - e_TSX_init_2*s(omega_TSX_init_2);
 di_x = i_TDX_init_2 - i_TSX_init_2;
 di_y = (RAAN_TDX_init_2 - RAAN_TSX_init_2)*sin(i_TSX_init_2); 
-
-
-% Print ROEs for June 21, 2010
-fprintf('\nRelative Quasi-Nonsingular Orbit Elements:\n');
-fprintf('---------------------------------------------------\n');
-fprintf('Relative Semi-Major Axis      : %.15f \n', da);
-fprintf('Relative Lambda       : %.15f \n', dlambda);
-fprintf('Relative Eccentricity Vector X: %.15f \n', de_x);
-fprintf('Relative Eccentricity Vector Y: %.15f \n', de_y);
-fprintf('Relative Inclination Vector X : %.15f \n', di_x);
-fprintf('Relative Inclination Vector Y : %.15f \n', di_y);
-
-roe_qns  = [da; dlambda; de_x; de_y; di_x; di_y];
-chief_oe = [a_TSX_init_2; e_TSX_init_2; i_TSX_init_2; ...
-            RAAN_TSX_init_2; omega_TSX_init_2; M_TSX_init_2];
-
-% time grid
-n_orbit = 15;
-T       = 2*pi/sqrt(mu/a_TSX_init_2^3);
-t_grid  = linspace(0, n_orbit*T, 1000).';
-
-[r_RTN_lin, v_RTN_lin] = propagateLinearEcc(roe_qns, chief_oe, t_grid, tol);
-
