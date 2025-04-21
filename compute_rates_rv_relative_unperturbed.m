@@ -4,7 +4,7 @@
 %   
 % Outputs: 
 
-function [rv_dot] = compute_rates_rv_relative_unperturbed(t, )
+function [rv_dot] = compute_rates_rv_relative_unperturbed(t, rv)
 
     mu = 3.986004418e14; % (m^3/s^2)
 

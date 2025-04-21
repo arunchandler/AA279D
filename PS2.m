@@ -318,9 +318,6 @@ init_state_d = [init_TDX_rv_RTN_d; r0_init_d];
 [t_out, TSX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TSX_rv_ECI_d, tint);
 [t_out, TDX_rv_out_unperturbed_d] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', init_TDX_rv_ECI_d, tint);
 
-
-
-
 TDX_rv_RTN_d = zeros(num_points, 6);
 
 for idx = 1:num_points

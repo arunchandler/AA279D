@@ -68,5 +68,5 @@ function params = rv2oe(X, mu)
     e_vec_perifocal = (R_p2i') .* e_vec;
     e_vec_perifocal = e_vec_perifocal(1:2); % Only x and y components in perifocal frame
 
-    params = [a, e, i, RAAN, omega, nu, energy, h, e_vec_perifocal];
+    params = [a, e, i, RAAN, omega, nu, energy, h', e_vec_perifocal];
 end
