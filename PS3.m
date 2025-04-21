@@ -67,48 +67,55 @@ Ks_init = getHCWconstants(rv_rel_init_RTN, a_TSX_init, tstart);
 
 % Part d) propagate state using HCW equations
 
-[t_out, TDX_RTN] = ode4(@compute_rates_rv_HCW_unperturbed, [tstart, tend]', rv_rel_init_RTN, tint);
+TDX_RTN_HCW = zeros(num_points, 6);
+
+%[t_out, TDX_RTN] = ode4(@compute_rates_rv_HCW_unperturbed, [tstart, tend]', rv_rel_init_RTN, tint);
+
+for idx = 1:num_points
+    Phi = buildHCWphi(a_TSX_init, t_vec(idx));
+    TDX_RTN_HCW(idx, :) = Phi * Ks_init;
+end
 
 figure;
 subplot(3,1,1)
-plot(t_out_orbit, TDX_RTN(:,1));
+plot(t_out_orbit, TDX_RTN_HCW(:,1));
 xlabel('Orbits');
 ylabel('R Position [m]');
 grid on;
 
 subplot(3,1,2)
-plot(t_out_orbit, TDX_RTN(:,2));
+plot(t_out_orbit, TDX_RTN_HCW(:,2));
 xlabel('Orbits');
 ylabel('T Position [m]');
 grid on;
 
 subplot(3,1,3)
-plot(t_out_orbit, TDX_RTN(:,3));
+plot(t_out_orbit, TDX_RTN_HCW(:,3));
 xlabel('Orbits');
 ylabel('N Position [m]');
 grid on;
 
 figure;
 subplot(2,2,1)
-plot(TDX_RTN(:,2), TDX_RTN(:,1))
+plot(TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,1))
 xlabel('T Position [m]')
 ylabel('R Position [m]')
 grid on
 
 subplot(2,2,2)
-plot(TDX_RTN(:,3), TDX_RTN(:,1))
+plot(TDX_RTN_HCW(:,3), TDX_RTN_HCW(:,1))
 xlabel('N Position [m]')
 ylabel('R Position [m]')
 grid on
 
 subplot(2,2,3)
-plot(TDX_RTN(:,2), TDX_RTN(:,3))
+plot(TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,3))
 xlabel('T Position [m]')
 ylabel('N Position [m]')
 grid on
 
 subplot(2,2,4)
-plot3(TDX_RTN(:,1), TDX_RTN(:,2), TDX_RTN(:,3))
+plot3(TDX_RTN_HCW(:,1), TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,3))
 xlabel('R Position [m]')
 ylabel('T Position [m]')
 zlabel('N Position [m]')

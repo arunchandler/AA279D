@@ -1,7 +1,7 @@
 % rates function for numerical integration for relative motion
 % unperturbed
 % Inputs:
-%   state : TDX rv_RTN 6x1, r0 (TSX in ECI) 6x1 
+%   state : TDX rv_RTN 6x1, r0 (TSX in ECI) 6x1, total 12x1
 % Outputs: 
 
 function [state_dot] = compute_rates_rv_rel_unperturbed_RTN(t, state)
