@@ -63,8 +63,7 @@ M_diff_init = M_TSX_init - M_TDX_init;
 
 % Part c) compute six HCW integration constants
 
-Ks_TSX_init = getHCWconstants(rv_TSX_init, a_TSX_init, tstart);
-Ks_TDX_init = getHCWconstants(rv_TDX_init, a_TDX_init, tstart);
+Ks_init = getHCWconstants(rv_rel_init_RTN, a_TSX_init, tstart);
 
 % Part d) propagate state using HCW equations
 
