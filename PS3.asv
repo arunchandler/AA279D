@@ -133,7 +133,7 @@ e_TDX_init_2 = 0.1 + 5e-6; % small offset in eccentricity but close enough to ke
 i_TDX_init_2 = deg2rad(97.4454);
 RAAN_TDX_init_2 = deg2rad(351.0106);
 omega_TDX_init_2 = deg2rad(101.2452);
-M_TDX_init_2 = M_TSX_init_2 + 1e-4; % added 0.0001
+M_TDX_init_2 = deg2rad(201.086+12.35936); % added 0.0001
 
 %initial cheif rv
 rv_TSX_init_2 = oe2rv([a_TSX_init_2, e_TSX_init_2, i_TSX_init_2, RAAN_TSX_init_2, omega_TSX_init_2, M_TSX_init_2], mu);
