@@ -132,8 +132,8 @@ a_TDX_init_2 =  6886536.686; % still same semi-major axis
 e_TDX_init_2 = 0.1 + 5e-6; % small offset in eccentricity but close enough to keep distance ratio low
 i_TDX_init_2 = deg2rad(97.4454);
 RAAN_TDX_init_2 = deg2rad(351.0106);
-omega_TDX_init_2 = deg2rad(101.2452);
-M_TDX_init_2 = M_TSX_init_2 + 1e-4; % added 0.0001
+omega_TDX_init_2 = deg2rad(-100.5043);
+M_TDX_init_2 = deg2rad(201.086+12.35936); % added 0.0001
 
 %initial cheif rv
 rv_TSX_init_2 = oe2rv([a_TSX_init_2, e_TSX_init_2, i_TSX_init_2, RAAN_TSX_init_2, omega_TSX_init_2, M_TSX_init_2], mu);
@@ -199,25 +199,31 @@ t_orbit = t_grid / T;
 r_RTN = zeros(N,3);
 v_RTN = zeros(N,3);
 
+n_orbit = 15;
+T       = 2*pi/n;
+N       = 10000;
+t_grid  = linspace(0, n_orbit*T, N).';
+
+r_RTN = zeros(N,3);
+v_RTN = zeros(N,3);
+
 for k = 1:N
     t = t_grid(k);
 
     % 1) Mean → Eccentric → True anomaly
     M = M0 + n*t;
-    f = mean2true(M, e, tol);     % your provided solver
+    f = mean2true(M, e, tol);
 
-    % 2) Build Phi at (f, f0) with the correct tau
-    tau = n*t / eta^3;           % ∫df/k^2 = n·t/η^3
+    % 2) Build YA transition (absolute units)
+    tau = n*t / eta^3;
     Phi = buildYAphi(a, e, f, f0, tau);
 
-    % 3) normalized state & back to RTN
-    X      = Phi * Ks;           % [x̄; ȳ; z̄; x̄'; ȳ'; z̄']
-    r_RTN(k,:) = (X(1:3)' * r0);
+    % 3) Apply to your K‐vector
+    X = Phi * Ks;      % now X = [x; y; z; vx; vy; vz] in [m,m,m,m/s,m/s,m/s]
 
-    % 4) recover velocity
-    r_k     = p / (1 + e*cos(f));  
-    fdot    = h / r_k^2;
-    v_RTN(k,:) = (X(4:6)' * r0) * fdot;
+    % 4) Store directly
+    r_RTN(k,:) = X(1:3)';    % [m]
+    v_RTN(k,:) = X(4:6)';    % [m/s]
 end
 
 
@@ -444,12 +450,10 @@ for ii = 1:6
 end
 
 n_orbit = 15;
-T       = 2*pi / n;
+T       = 2*pi/n;
 N       = 10000;
-t_grid  = linspace(0, n_orbit*T, N).';    % [s]
-t_orbit = t_grid / T;
+t_grid  = linspace(0, n_orbit*T, N).';
 
-% preallocate RTN arrays
 r_RTN = zeros(N,3);
 v_RTN = zeros(N,3);
 
@@ -458,20 +462,18 @@ for k = 1:N
 
     % 1) Mean → Eccentric → True anomaly
     M = M0 + n*t;
-    f = mean2true(M, e, tol);     % your provided solver
+    f = mean2true(M, e, tol);
 
-    % 2) Build Phi at (f, f0) with the correct tau
-    tau = n*t / eta^3;           % ∫df/k^2 = n·t/η^3
+    % 2) Build YA transition (absolute units)
+    tau = n*t / eta^3;
     Phi = buildYAphi(a, e, f, f0, tau);
 
-    % 3) normalized state & back to RTN
-    X      = Phi * Ks;           % [x̄; ȳ; z̄; x̄'; ȳ'; z̄']
-    r_RTN(k,:) = (X(1:3)' * r0);
+    % 3) Apply to your K‐vector
+    X = Phi * Ks;      % now X = [x; y; z; vx; vy; vz] in [m,m,m,m/s,m/s,m/s]
 
-    % 4) recover velocity
-    r_k     = p / (1 + e*cos(f));  
-    fdot    = h / r_k^2;
-    v_RTN(k,:) = (X(4:6)' * r0) * fdot;
+    % 4) Store directly
+    r_RTN(k,:) = X(1:3)';    % [m]
+    v_RTN(k,:) = X(4:6)';    % [m/s]
 end
 
 
@@ -662,7 +664,7 @@ p  = a_TSX_init_2 * (1 - e_TSX_init_2^2);
 r0  = p / (1 + e_TSX_init_2 * cos(nu_TSX_init_2));
 ratio = ro_init / r_peri; 
 
-fprintf('\nPart i-ii Relevant Initial Orbital Elements for TH Formulation\n');
+fprintf('\nPart i-iiRelevant Initial Orbital Elements for TH Formulation\n');
 fprintf('---------------------------------------------------\n');
 fprintf('Initial Minimum Distance      : %.15f m\n', r_peri);
 fprintf('Initial Relative Distance       : %.15f m\n', ro_init);
@@ -690,12 +692,10 @@ for ii = 1:6
 end
 
 n_orbit = 15;
-T       = 2*pi / n;
+T       = 2*pi/n;
 N       = 10000;
-t_grid  = linspace(0, n_orbit*T, N).';    % [s]
-t_orbit = t_grid / T;
+t_grid  = linspace(0, n_orbit*T, N).';
 
-% preallocate RTN arrays
 r_RTN = zeros(N,3);
 v_RTN = zeros(N,3);
 
@@ -704,22 +704,19 @@ for k = 1:N
 
     % 1) Mean → Eccentric → True anomaly
     M = M0 + n*t;
-    f = mean2true(M, e, tol);     % your provided solver
+    f = mean2true(M, e, tol);
 
-    % 2) Build Phi at (f, f0) with the correct tau
-    tau = n*t / eta^3;           % ∫df/k^2 = n·t/η^3
+    % 2) Build YA transition (absolute units)
+    tau = n*t / eta^3;
     Phi = buildYAphi(a, e, f, f0, tau);
 
-    % 3) normalized state & back to RTN
-    X      = Phi * Ks;           % [x̄; ȳ; z̄; x̄'; ȳ'; z̄']
-    r_RTN(k,:) = (X(1:3)' * r0);
+    % 3) Apply to your K‐vector
+    X = Phi * Ks;      % now X = [x; y; z; vx; vy; vz] in [m,m,m,m/s,m/s,m/s]
 
-    % 4) recover velocity
-    r_k     = p / (1 + e*cos(f));  
-    fdot    = h / r_k^2;
-    v_RTN(k,:) = (X(4:6)' * r0) * fdot;
+    % 4) Store directly
+    r_RTN(k,:) = X(1:3)';    % [m]
+    v_RTN(k,:) = X(4:6)';    % [m/s]
 end
-
 
 da = (a_TDX_init_2 - a_TSX_init_2) / a_TSX_init_2;
 dlambda = (M_TDX_init_2 + omega_TDX_init_2) - (M_TSX_init_2 + omega_TSX_init_2) + (RAAN_TDX_init_2 - RAAN_TSX_init_2)*cos(i_TSX_init_2);
@@ -778,7 +775,7 @@ rho    = vecnorm(r_rel, 2, 2);          % ||relative|| [m]
 ratio  = rho ./ r_chief;                % dimensionless
 ratio_avg = mean(ratio);
 
-fprintf('\n Part i-ii Nonlinear Trajectory Separation Check\n');
+fprintf('\nNonlinear Trajectory Separation Check\n');
 fprintf('-------------------------------------\n');
 fprintf('Mean ||ρ||/r_c  = %.3e (should be ≲1e–3)\n', ratio_avg);
 fprintf('Max  ||ρ||/r_c  = %.3e\n', max(ratio));
