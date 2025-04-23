@@ -77,8 +77,8 @@ function [r_RTN, v_RTN] = propagateLinearEcc( ...
                   0,    0,    0,    0, bzp5, bzp6 ];
 
       % 4) full position mapping
-      %   [x;y;z] = a*n^2 * Bpos * roe_qns
-      r_RTN(k,:) = (a * n^2 * (Bpos * roe_qns))';
+      %   [x;y;z] = a*eta^2 * Bpos * roe_qns
+      r_RTN(k,:) = (a * eta^2 * (Bpos * roe_qns))';
 
       % 5) build B_vel (3×6)
       %    (these come from the lower block of eq. (2.47))

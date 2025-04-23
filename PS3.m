@@ -52,6 +52,7 @@ rv_TDX_init = oe2rv([a_TDX_init, e_TDX_init, i_TDX_init, RAAN_TDX_init, omega_TD
 
 %relativive rv
 [rv_rel_init_RTN, ~] = eci2rtn(rv_TSX_init, rv_TDX_init);
+disp(rv_rel_init_RTN)
 
 %orbital element differeces
 a_diff_init = a_TDX_init - a_TSX_init;
@@ -159,9 +160,9 @@ rv_TDX_init_2 = oe2rv([a_TDX_init_2, e_TDX_init_2, i_TDX_init_2, RAAN_TDX_init_2
 a_diff_init_2 = a_TDX_init_2 - a_TSX_init_2;
 i_diff_init_2 = i_TDX_init_2 - i_TSX_init_2;
 e_diff_init_2 = e_TDX_init_2 - e_TSX_init_2;
-RAAN_diff_init_2 = RAAN_TSX_init_2 - RAAN_TDX_init_2;
-omega_diff_init_2 = omega_TSX_init_2 - omega_TDX_init_2;
-M_diff_init_2 = M_TSX_init_2 - M_TDX_init_2;
+RAAN_diff_init_2 = RAAN_TDX_init_2 - RAAN_TSX_init_2;
+omega_diff_init_2 = omega_TDX_init_2 - omega_TSX_init_2;
+M_diff_init_2 = M_TDX_init_2 - M_TSX_init_2;
 
 r_peri = a_TSX_init_2*(1 - e_TSX_init_2);
 
@@ -215,8 +216,7 @@ for k = 1:N
 
     % 1) Mean → Eccentric → True anomaly
     M = M0 + n*t;
-    E = mean2ecc(M, e, tol);     % your provided solver
-    f = ecc2true(E, e);          % your provided converter
+    f = mean2true(M, e, tol);     % your provided solver
 
     % 2) Build Phi at (f, f0) with the correct tau
     tau = n*t / eta^3;           % ∫df/k^2 = n·t/η^3
@@ -278,14 +278,18 @@ roe_qns  = [da; dlambda; de_x; de_y; di_x; di_y];
 chief_oe = [a_TSX_init_2; e_TSX_init_2; i_TSX_init_2; ...
             RAAN_TSX_init_2; omega_TSX_init_2; M_TSX_init_2];
 
+% f) geometric linear mapping propagation
 % time grid
 n_orbit = 15;
 T       = 2*pi/sqrt(mu/a_TSX_init_2^3);
-t_grid  = linspace(0, n_orbit*T, 1000).';
+t_int   = n_orbit*T/(N-1);
+t_start = 0;
+t_end = n_orbit*T;
+t_grid  = linspace(t_start, t_end, N).';
 
 [r_RTN_lin, v_RTN_lin] = propagateLinearEcc(roe_qns, chief_oe, t_grid, tol);
 
-figure('Name','Relative Position Comparison','NumberTitle','off');
+figure;
 
 % R‐component
 subplot(3,1,1)
@@ -306,7 +310,7 @@ plot(t_orbit, r_RTN_lin(:,3),'r-');
 xlabel('Orbits'); ylabel('N [m]'); grid on
 
 
-figure('Name','Relative Velocity Comparison','NumberTitle','off');
+figure;
 
 % Ṙ‐component
 subplot(3,1,1)
@@ -326,7 +330,7 @@ plot(t_orbit, v_RTN(:,3),'b--'); hold on;
 plot(t_orbit, v_RTN_lin(:,3),'r-');
 xlabel('Orbits'); ylabel('Ṅ [m/s]'); grid on
 
-figure('Name','Relative Paths','NumberTitle','off');
+figure;
 
 subplot(2,2,1)
 plot(r_RTN(:,2), r_RTN(:,1), 'b--'); hold on;
@@ -348,3 +352,54 @@ plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
 plot3(r_RTN_lin(:,1), r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
 xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]')
 axis equal, grid on, view(3)
+
+% h) nonlinear equations propagation
+
+[t_out, TDX_RTN_2] = ode4(@compute_rates_rv_HCW_unperturbed, [t_start, t_end]', rv_rel_init_RTN_2, t_int);
+ 
+figure;
+subplot(3,1,1)
+plot(t_orbit, TDX_RTN_2(:,1));
+xlabel('Orbits');
+ylabel('R Position [m]');
+grid on;
+
+subplot(3,1,2)
+plot(t_orbit, TDX_RTN_2(:,2));
+xlabel('Orbits');
+ylabel('T Position [m]');
+grid on;
+
+subplot(3,1,3)
+plot(t_orbit, TDX_RTN_2(:,3));
+xlabel('Orbits');
+ylabel('N Position [m]');
+grid on;
+
+figure;
+subplot(2,2,1)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,1))
+xlabel('T Position [m]')
+ylabel('R Position [m]')
+grid on
+
+subplot(2,2,2)
+plot(TDX_RTN_2(:,3), TDX_RTN_2(:,1))
+xlabel('N Position [m]')
+ylabel('R Position [m]')
+grid on
+
+subplot(2,2,3)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+xlabel('T Position [m]')
+ylabel('N Position [m]')
+grid on
+
+subplot(2,2,4)
+plot3(TDX_RTN_2(:,1), TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+xlabel('R Position [m]')
+ylabel('T Position [m]')
+zlabel('N Position [m]')
+grid on
+axis equal
+view(3)
