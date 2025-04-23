@@ -31,10 +31,10 @@ u_TSX_init = nu_TSX_init + omega_TSX_init;
 %initial deputy elements
 a_TDX_init =  6886536.686;
 e_TDX_init = 0.0001269;
-i_TDX_init = deg2rad(97.4454);
+i_TDX_init = deg2rad(97.4554); % added 0.01
 RAAN_TDX_init = deg2rad(351.0106);
 omega_TDX_init = deg2rad(-100.5043);
-M_TDX_init = deg2rad(201.086+12.35936); % added 0.0001
+M_TDX_init = deg2rad(201.086+12.35936); 
 
 global n
 
@@ -78,40 +78,60 @@ Ks_init = getHCWconstants(rv_rel_init_RTN, a_TSX_init, tstart)
 
 TDX_RTN_HCW = zeros(num_points, 6);
 
-%[t_out, TDX_RTN] = ode4(@compute_rates_rv_HCW_unperturbed, [tstart, tend]', rv_rel_init_RTN, tint);
-
 for idx = 1:num_points
     Phi = buildHCWphi(a_TSX_init, t_vec(idx));
     TDX_RTN_HCW(idx, :) = Phi * Ks_init;
 end
 
-%% Problem 1 d) HCW propagation – positions vs orbits
-figure('Name','HCW RTN Position vs Orbits','NumberTitle','off');
+figure;
 subplot(3,1,1)
-  plot(t_out_orbit, TDX_RTN_HCW(:,1));
-  xlabel('Orbits'); ylabel('R [m]'); grid on;
-subplot(3,1,2)
-  plot(t_out_orbit, TDX_RTN_HCW(:,2));
-  xlabel('Orbits'); ylabel('T [m]'); grid on;
-subplot(3,1,3)
-  plot(t_out_orbit, TDX_RTN_HCW(:,3));
-  xlabel('Orbits'); ylabel('N [m]'); grid on;
+plot(t_out_orbit, TDX_RTN_HCW(:,1));
+xlabel('Orbits');
+ylabel('R Position [m]');
+grid on;
 
-%% Problem 1 d) HCW propagation – 2D & 3D RTN trajectories
-figure('Name','HCW RTN Trajectories','NumberTitle','off');
+subplot(3,1,2)
+plot(t_out_orbit, TDX_RTN_HCW(:,2));
+xlabel('Orbits');
+ylabel('T Position [m]');
+grid on;
+
+subplot(3,1,3)
+plot(t_out_orbit, TDX_RTN_HCW(:,3));
+xlabel('Orbits');
+ylabel('N Position [m]');
+grid on;
+
+figure;
 subplot(2,2,1)
-  plot(TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,1))
-  xlabel('T [m]'); ylabel('R [m]'); grid on;
+plot(TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,1))
+xlabel('T Position [m]')
+ylabel('R Position [m]')
+grid on;
+axis equal;
+
 subplot(2,2,2)
-  plot(TDX_RTN_HCW(:,3), TDX_RTN_HCW(:,1))
-  xlabel('N [m]'); ylabel('R [m]'); grid on;
+plot(TDX_RTN_HCW(:,3), TDX_RTN_HCW(:,1))
+xlabel('N Position [m]')
+ylabel('R Position [m]')
+grid on;
+axis equal;
+
 subplot(2,2,3)
-  plot(TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,3))
-  xlabel('T [m]'); ylabel('N [m]'); grid on;
+plot(TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,3))
+xlabel('T Position [m]')
+ylabel('N Position [m]')
+grid on
+axis equal;
+
 subplot(2,2,4)
-  plot3(TDX_RTN_HCW(:,1), TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,3))
-  xlabel('R [m]'); ylabel('T [m]'); zlabel('N [m]');
-  axis equal; grid on; view(3);
+plot3(TDX_RTN_HCW(:,1), TDX_RTN_HCW(:,2), TDX_RTN_HCW(:,3))
+xlabel('R Position [m]')
+ylabel('T Position [m]')
+zlabel('N Position [m]')
+grid on
+axis equal
+view(3)
 
 %% Problem 2
 
@@ -129,11 +149,11 @@ u_TSX_init_2 = nu_TSX_init + omega_TSX_init;
 
 %initial deputy elements
 a_TDX_init_2 =  6886536.686; % still same semi-major axis 
-e_TDX_init_2 = 0.1 + 5e-6; % small offset in eccentricity but close enough to keep distance ratio low
-i_TDX_init_2 = deg2rad(97.4454);
+e_TDX_init_2 = 0.0001269;
+i_TDX_init_2 = deg2rad(97.5454);
 RAAN_TDX_init_2 = deg2rad(351.0106);
-omega_TDX_init_2 = deg2rad(101.2452);
-M_TDX_init_2 = M_TSX_init_2 + 1e-4; % added 0.0001
+omega_TDX_init_2 = deg2rad(100.5043);
+M_TDX_init_2 = deg2rad(12.35936); % added 0.0001
 
 %initial cheif rv
 rv_TSX_init_2 = oe2rv([a_TSX_init_2, e_TSX_init_2, i_TSX_init_2, RAAN_TSX_init_2, omega_TSX_init_2, M_TSX_init_2], mu);
@@ -220,6 +240,25 @@ for k = 1:N
     v_RTN(k,:) = (X(4:6)' * r0) * fdot;
 end
 
+figure;
+subplot(3,1,1)
+plot(t_orbit, r_RTN(:,1)), xlabel('Orbits'), ylabel('R [m]'), grid on
+subplot(3,1,2)
+plot(t_orbit, r_RTN(:,2)), xlabel('Orbits'), ylabel('T [m]'), grid on
+subplot(3,1,3)
+plot(t_orbit, r_RTN(:,3)), xlabel('Orbits'), ylabel('N [m]'), grid on
+
+figure;
+subplot(2,2,1)
+plot(r_RTN(:,2), r_RTN(:,1)), xlabel('T [m]'), ylabel('R [m]'), grid on
+subplot(2,2,2)
+plot(r_RTN(:,3), r_RTN(:,1)), xlabel('N [m]'), ylabel('R [m]'), grid on
+subplot(2,2,3)
+plot(r_RTN(:,2), r_RTN(:,3)), xlabel('T [m]'), ylabel('N [m]'), grid on
+subplot(2,2,4)
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3))
+xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]'),
+axis equal, view(3), grid on
 
 % d) explain trends (need to write up) 
 
@@ -258,116 +297,142 @@ t_grid  = linspace(t_start, t_end, N).';
 
 [r_RTN_lin, v_RTN_lin] = propagateLinearEcc(roe_qns, chief_oe, t_grid, tol);
 
+figure;
+
+% R‐component
+subplot(3,1,1)
+plot(t_orbit, r_RTN(:,1),'b--', 'DisplayName','YA'); hold on;
+plot(t_orbit, r_RTN_lin(:,1),'r-',  'DisplayName','Linear');
+ylabel('R [m]'); legend('Location','best'); grid on
+
+% T‐component
+subplot(3,1,2)
+plot(t_orbit, r_RTN(:,2),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,2),'r-');
+ylabel('T [m]'); grid on
+
+% N‐component
+subplot(3,1,3)
+plot(t_orbit, r_RTN(:,3),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('N [m]'); grid on
+
+
+figure;
+
+% Ṙ‐component
+subplot(3,1,1)
+plot(t_orbit, v_RTN(:,1),'b--','DisplayName','YA'); hold on;
+plot(t_orbit, v_RTN_lin(:,1),'r-','DisplayName','Linear');
+ylabel('Ṙ [m/s]'); legend('Location','best'); grid on
+
+% Ṫ‐component
+subplot(3,1,2)
+plot(t_orbit, v_RTN(:,2),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,2),'r-');
+ylabel('Ṫ [m/s]'); grid on
+
+% Ṅ‐component
+subplot(3,1,3)
+plot(t_orbit, v_RTN(:,3),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('Ṅ [m/s]'); grid on
+
+figure;
+
+subplot(2,2,1)
+plot(r_RTN(:,2), r_RTN(:,1), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,1), 'r-')
+xlabel('T [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,2)
+plot(r_RTN(:,3), r_RTN(:,1), 'b--'); hold on; 
+plot(r_RTN_lin(:,3), r_RTN_lin(:,1), 'r-')
+xlabel('N [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,3)
+plot(r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('T [m]'), ylabel('N [m]'), grid on
+
+subplot(2,2,4)
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot3(r_RTN_lin(:,1), r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]')
+axis equal, grid on, view(3)
+
 % h) nonlinear equations propagation
 
+%[t_out, TDX_RTN_2] = ode4(@compute_rates_rv_rel_linear_unperturbed, [t_start, t_end]', rv_rel_init_RTN_2, t_int);
 [t_out, TDX_RTN_2] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [t_start, t_end]', [rv_rel_init_RTN_2; rv_TSX_init_2], t_int);
+ 
+figure;
+subplot(3,1,1)
+plot(t_orbit, TDX_RTN_2(:,1));
+hold on
+plot(t_orbit, r_RTN(:,1))
+plot(t_orbit, r_RTN_lin(:,1))
+xlabel('Orbits');
+ylabel('R Position [m]');
+grid on;
 
-% check rho ratio throughout entire diff eq simulation: 
+subplot(3,1,2)
+plot(t_orbit, TDX_RTN_2(:,2));
+hold on
+plot(t_orbit, r_RTN(:,2))
+plot(t_orbit, r_RTN_lin(:,2))
+xlabel('Orbits');
+ylabel('T Position [m]');
+grid on;
 
-r_rel = TDX_RTN_2(:,1:3);            % [m] (N×3)
+subplot(3,1,3)
+plot(t_orbit, TDX_RTN_2(:,3));
+hold on
+plot(t_orbit, r_RTN(:,3))
+plot(t_orbit, r_RTN_lin(:,3))
+xlabel('Orbits');
+ylabel('N Position [m]');
+grid on;
 
-% preallocate
-Npts = numel(t_out);
-r_chief = zeros(Npts,1);
+figure;
+subplot(2,2,1)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,1))
+hold on
+plot(r_RTN(:,2), r_RTN(:,1))
+plot(r_RTN_lin(:,2), r_RTN_lin(:,1))
+xlabel('T Position [m]')
+ylabel('R Position [m]')
+grid on
 
-for k = 1:Npts
-    Mk = M0 + n * t_out(k);
-    Ek = mean2ecc(Mk, e, tol);
-    fk = ecc2true(Ek, e);
-    r_chief(k) = p / (1 + e*cos(fk));    % [m]
-end
+subplot(2,2,2)
+plot(TDX_RTN_2(:,3), TDX_RTN_2(:,1))
+hold on
+plot(r_RTN(:,3), r_RTN(:,1))
+plot(r_RTN_lin(:,3), r_RTN_lin(:,1))
+xlabel('N Position [m]')
+ylabel('R Position [m]')
+grid on
 
-% 3) compute the ratio vector and its average
-rho    = vecnorm(r_rel, 2, 2);          % ||relative|| [m]
-ratio  = rho ./ r_chief;                % dimensionless
-ratio_avg = mean(ratio);
+subplot(2,2,3)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+hold on
+plot(r_RTN(:,2), r_RTN(:,3))
+plot(r_RTN_lin(:,2), r_RTN_lin(:,3))
+xlabel('T Position [m]')
+ylabel('N Position [m]')
+grid on
 
-fprintf('\nNonlinear Trajectory Separation Check\n');
-fprintf('-------------------------------------\n');
-fprintf('Mean ||ρ||/r_c  = %.3e (should be ≲1e–3)\n', ratio_avg);
-fprintf('Max  ||ρ||/r_c  = %.3e\n', max(ratio));
-fprintf('Min  ||ρ||/r_c  = %.3e\n', min(ratio));
-
-
-
-% convert to km / km-s
-rYA   = r_RTN       / 1e3;         % [km]
-rLIN  = r_RTN_lin   / 1e3;         % [km]
-rTR   = TDX_RTN_2(:,1:3) / 1e3;    % [km]
-
-%vTR   = TDX_RTN_2(:,4:6);    % [m/s]
-
-
-% 1) YA only — Position Planes
-figure('Name','YA Only (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rYA(:,2), rYA(:,1), 'r', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,2)
-  plot(rYA(:,3), rYA(:,1), 'r', 'LineWidth', 1.0);
-  xlabel('N [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,3)
-  plot(rYA(:,2), rYA(:,3), 'r', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
-
-% 1b) YA only — Position 3D
-figure('Name','YA Only (3D Pos)','NumberTitle','off');
-plot3(rYA(:,1), rYA(:,2), rYA(:,3), 'r', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-axis equal; grid on; view(3);
-
-
-% 2) YA + Linear — Position Planes
-figure('Name','YA vs Linear (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rYA(:,2), rYA(:,1),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,2),rLIN(:,1),'b', 'LineWidth', 1.0); 
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-  legend('YA','Geo. Map.','Location','best');
-subplot(1,3,2)
-  plot(rYA(:,3), rYA(:,1),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,3),rLIN(:,1),'b', 'LineWidth', 1.0); 
-  xlabel('N [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,3)
-  plot(rYA(:,2), rYA(:,3),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0); 
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
-
-% 2b) YA + Linear — Position 3D
-figure('Name','YA vs Linear (3D Pos)','NumberTitle','off');
-plot3(rYA(:,1),rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0); hold on;
-plot3(rLIN(:,1),rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-legend('YA','Geo. Map.','Location','best'); axis equal; grid on; view(3);
-
-
-% 3) YA + Linear + Truth — Position Planes
-figure('Name','All Three (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rTR(:,2),rTR(:,1),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,2),rYA(:,1),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,2),rLIN(:,1),'b', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-  legend('Non. Linear Diff. Eq. ','YA','Geo. Map.','Location','best');
-subplot(1,3,2)
-  plot(rTR(:,3),rTR(:,1),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,3),rYA(:,1),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,3),rLIN(:,1),'b', 'LineWidth', 1.0);
-  xlabel('N [km]'); ylabel('R [km]');grid on;
-subplot(1,3,3)
-  plot(rTR(:,2),rTR(:,3),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
-
-% 3b) YA + Linear + Truth — Position 3D
-figure('Name','All Three (3D Pos)','NumberTitle','off');
-plot3(rTR(:,1),rTR(:,2),rTR(:,3),'c', 'LineWidth', 1.0); hold on;
-plot3(rYA(:,1),rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0);
-plot3(rLIN(:,1),rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-legend('Non. Linear Diff. Eq. ','YA','Geo. Map.','Location','best');
-axis equal; grid on; view(3);
+subplot(2,2,4)
+plot3(TDX_RTN_2(:,1), TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+hold on
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3))
+plot3(r_RTN_lin(:,2), r_RTN_lin(:,2), r_RTN_lin(:,3))
+xlabel('R Position [m]')
+ylabel('T Position [m]')
+zlabel('N Position [m]')
+grid on
+axis equal
+view(3)
 
 % i) Problem 2 but with da
 
@@ -381,13 +446,13 @@ M_TSX_init_2 = deg2rad(11.6520);
 nu_TSX_init_2 = mean2true(M_TSX_init, e_TSX_init,tol);
 u_TSX_init_2 = nu_TSX_init + omega_TSX_init;
 
-%initial deputy elements
-a_TDX_init_2 =  6886436.686; % -100
-e_TDX_init_2 = 0.0001269;
-i_TDX_init_2 = deg2rad(97.4454);
-RAAN_TDX_init_2 = deg2rad(351.0106);
-omega_TDX_init_2 = deg2rad(-100.5043);
-M_TDX_init_2 = deg2rad(201.086+12.35936); % added 0.0001
+%initial deputy elements - chief but a-1000, i+0.05, M+0.001
+a_TDX_init_2 =  6885536.686;
+e_TDX_init_2 = 0.0001264;
+i_TDX_init_2 = deg2rad(97.4553);
+RAAN_TDX_init_2 = deg2rad(351.0108);
+omega_TDX_init_2 = deg2rad(101.2452);
+M_TDX_init_2 = deg2rad(11.6530);
 
 
 %initial cheif rv
@@ -415,7 +480,7 @@ p  = a_TSX_init_2 * (1 - e_TSX_init_2^2);
 r0  = p / (1 + e_TSX_init_2 * cos(nu_TSX_init_2));
 ratio = ro_init / r_peri; 
 
-fprintf('\nPart i-i: Relevant Initial Orbital Elements for TH Formulation \n');
+fprintf('\nRelevant Initial Orbital Elements for TH Formulation\n');
 fprintf('---------------------------------------------------\n');
 fprintf('Initial Minimum Distance      : %.15f m\n', r_peri);
 fprintf('Initial Relative Distance       : %.15f m\n', ro_init);
@@ -434,10 +499,9 @@ h    = sqrt(mu*p);
 eta  = sqrt(1 - e^2);
 r0   = p / (1 + e*cos(f0));
 
-
 Ks = getYAconstants(rv_rel_init_RTN_2, a, e, f0);
 
-fprintf('\nPart i-i YA Integration Constants:\n');
+fprintf('\nYA Integration Constants:\n');
 fprintf('-------------------------\n');
 for ii = 1:6
     fprintf('K%d = %12.6e\n', ii, Ks(ii));
@@ -474,6 +538,25 @@ for k = 1:N
     v_RTN(k,:) = (X(4:6)' * r0) * fdot;
 end
 
+figure;
+subplot(3,1,1)
+plot(t_orbit, r_RTN(:,1)), xlabel('Orbits'), ylabel('R [m]'), grid on
+subplot(3,1,2)
+plot(t_orbit, r_RTN(:,2)), xlabel('Orbits'), ylabel('T [m]'), grid on
+subplot(3,1,3)
+plot(t_orbit, r_RTN(:,3)), xlabel('Orbits'), ylabel('N [m]'), grid on
+
+figure;
+subplot(2,2,1)
+plot(r_RTN(:,2), r_RTN(:,1)), xlabel('T [m]'), ylabel('R [m]'), grid on
+subplot(2,2,2)
+plot(r_RTN(:,3), r_RTN(:,1)), xlabel('N [m]'), ylabel('R [m]'), grid on
+subplot(2,2,3)
+plot(r_RTN(:,2), r_RTN(:,3)), xlabel('T [m]'), ylabel('N [m]'), grid on
+subplot(2,2,4)
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3))
+xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]'),
+axis equal, view(3), grid on
 
 da = (a_TDX_init_2 - a_TSX_init_2) / a_TSX_init_2;
 dlambda = (M_TDX_init_2 + omega_TDX_init_2) - (M_TSX_init_2 + omega_TSX_init_2) + (RAAN_TDX_init_2 - RAAN_TSX_init_2)*cos(i_TSX_init_2);
@@ -484,7 +567,7 @@ di_y = (RAAN_TDX_init_2 - RAAN_TSX_init_2)*sin(i_TSX_init_2);
 
 
 % Print ROEs for June 21, 2010
-fprintf('\nPart i-i Relative Quasi-Nonsingular Orbit Elements:\n');
+fprintf('\nRelative Quasi-Nonsingular Orbit Elements:\n');
 fprintf('---------------------------------------------------\n');
 fprintf('Relative Semi-Major Axis      : %.15f \n', da);
 fprintf('Relative Lambda       : %.15f \n', dlambda);
@@ -507,114 +590,139 @@ t_grid  = linspace(t_start, t_end, N).';
 
 [r_RTN_lin, v_RTN_lin] = propagateLinearEcc(roe_qns, chief_oe, t_grid, tol);
 
+figure;
 
+% R‐component
+subplot(3,1,1)
+plot(t_orbit, r_RTN(:,1),'b--', 'DisplayName','YA'); hold on;
+plot(t_orbit, r_RTN_lin(:,1),'r-',  'DisplayName','Linear');
+ylabel('R [m]'); legend('Location','best'); grid on
+
+% T‐component
+subplot(3,1,2)
+plot(t_orbit, r_RTN(:,2),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,2),'r-');
+ylabel('T [m]'); grid on
+
+% N‐component
+subplot(3,1,3)
+plot(t_orbit, r_RTN(:,3),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('N [m]'); grid on
+
+
+figure;
+
+% Ṙ‐component
+subplot(3,1,1)
+plot(t_orbit, v_RTN(:,1),'b--','DisplayName','YA'); hold on;
+plot(t_orbit, v_RTN_lin(:,1),'r-','DisplayName','Linear');
+ylabel('Ṙ [m/s]'); legend('Location','best'); grid on
+
+% Ṫ‐component
+subplot(3,1,2)
+plot(t_orbit, v_RTN(:,2),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,2),'r-');
+ylabel('Ṫ [m/s]'); grid on
+
+% Ṅ‐component
+subplot(3,1,3)
+plot(t_orbit, v_RTN(:,3),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('Ṅ [m/s]'); grid on
+
+figure;
+
+subplot(2,2,1)
+plot(r_RTN(:,2), r_RTN(:,1), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,1), 'r-')
+xlabel('T [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,2)
+plot(r_RTN(:,3), r_RTN(:,1), 'b--'); hold on; 
+plot(r_RTN_lin(:,3), r_RTN_lin(:,1), 'r-')
+xlabel('N [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,3)
+plot(r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('T [m]'), ylabel('N [m]'), grid on
+
+subplot(2,2,4)
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot3(r_RTN_lin(:,1), r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]')
+axis equal, grid on, view(3)
 
 [t_out, TDX_RTN_2] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [t_start, t_end]', [rv_rel_init_RTN_2; rv_TSX_init_2], t_int);
-
-% h) nonlinear equations propagation
-
-[t_out, TDX_RTN_2] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [t_start, t_end]', [rv_rel_init_RTN_2; rv_TSX_init_2], t_int);
-
-% check rho ratio throughout entire diff eq simulation: 
-
-r_rel = TDX_RTN_2(:,1:3);            % [m] (N×3)
-
-% preallocate
-Npts = numel(t_out);
-r_chief = zeros(Npts,1);
-
-for k = 1:Npts
-    Mk = M0 + n * t_out(k);
-    Ek = mean2ecc(Mk, e, tol);
-    fk = ecc2true(Ek, e);
-    r_chief(k) = p / (1 + e*cos(fk));    % [m]
-end
-
-% 3) compute the ratio vector and its average
-rho    = vecnorm(r_rel, 2, 2);          % ||relative|| [m]
-ratio  = rho ./ r_chief;                % dimensionless
-ratio_avg = mean(ratio);
-
-fprintf('\nPart i-i Nonlinear Trajectory Separation Check\n');
-fprintf('-------------------------------------\n');
-fprintf('Mean ||ρ||/r_c  = %.3e (should be ≲1e–3)\n', ratio_avg);
-fprintf('Max  ||ρ||/r_c  = %.3e\n', max(ratio));
-fprintf('Min  ||ρ||/r_c  = %.3e\n', min(ratio));
-
  
-% 1) YA only — Position Planes
-figure('Name','δa = –100 m:YA Only (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rYA(:,2), rYA(:,1), 'r', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,2)
-  plot(rYA(:,3), rYA(:,1), 'r', 'LineWidth', 1.0);
-  xlabel('N [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,3)
-  plot(rYA(:,2), rYA(:,3), 'r', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
+figure;
+subplot(3,1,1)
+plot(t_orbit, TDX_RTN_2(:,1));
+hold on
+plot(t_orbit, r_RTN(:,1))
+plot(t_orbit, r_RTN_lin(:,1))
+xlabel('Orbits');
+ylabel('R Position [m]');
+grid on;
 
-% 1b) YA only — Position 3D
-figure('Name','δa = –100 m:YA Only (3D Pos)','NumberTitle','off');
-plot3(rYA(:,1), rYA(:,2), rYA(:,3), 'r', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-axis equal; grid on; view(3);
+subplot(3,1,2)
+plot(t_orbit, TDX_RTN_2(:,2));
+hold on
+plot(t_orbit, r_RTN(:,2))
+plot(t_orbit, r_RTN_lin(:,2))
+xlabel('Orbits');
+ylabel('T Position [m]');
+grid on;
 
+subplot(3,1,3)
+plot(t_orbit, TDX_RTN_2(:,3));
+hold on
+plot(t_orbit, r_RTN(:,3))
+plot(t_orbit, r_RTN_lin(:,3))
+xlabel('Orbits');
+ylabel('N Position [m]');
+grid on;
 
+figure;
+subplot(2,2,1)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,1))
+hold on
+plot(r_RTN(:,2), r_RTN(:,1))
+plot(r_RTN_lin(:,2), r_RTN_lin(:,1))
+xlabel('T Position [m]')
+ylabel('R Position [m]')
+grid on
 
-% 2) YA + Linear — Position Planes
-figure('Name','δa = –100 m: YA vs Linear (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rYA(:,2), rYA(:,1),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,2),rLIN(:,1),'b', 'LineWidth', 1.0); 
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-  legend('YA','Geo. Map.','Location','best');
-subplot(1,3,2)
-  plot(rYA(:,3), rYA(:,1),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,3),rLIN(:,1),'b', 'LineWidth', 1.0); 
-  xlabel('N [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,3)
-  plot(rYA(:,2), rYA(:,3),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0); 
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
+subplot(2,2,2)
+plot(TDX_RTN_2(:,3), TDX_RTN_2(:,1))
+hold on
+plot(r_RTN(:,3), r_RTN(:,1))
+plot(r_RTN_lin(:,3), r_RTN_lin(:,1))
+xlabel('N Position [m]')
+ylabel('R Position [m]')
+grid on
 
-% 2b) YA + Linear — Position 3D
-figure('Name','δa = –100 m: YA vs Linear (3D Pos)','NumberTitle','off');
-plot3(rYA(:,1),rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0); hold on;
-plot3(rLIN(:,1),rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-legend('YA','Geo. Map.','Location','best'); axis equal; grid on; view(3);
+subplot(2,2,3)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+hold on
+plot(r_RTN(:,2), r_RTN(:,3))
+plot(r_RTN_lin(:,2), r_RTN_lin(:,3))
+xlabel('T Position [m]')
+ylabel('N Position [m]')
+grid on
 
-
-
-
-% 3) YA + Linear + Truth — Position Planes
-figure('Name','δa = –100 m: All Three (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rTR(:,2),rTR(:,1),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,2),rYA(:,1),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,2),rLIN(:,1),'b', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-  legend('Non. Linear Diff. Eq. ','YA','Geo. Map.','Location','best');
-subplot(1,3,2)
-  plot(rTR(:,3),rTR(:,1),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,3),rYA(:,1),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,3),rLIN(:,1),'b', 'LineWidth', 1.0);
-  xlabel('N [km]'); ylabel('R [km]');grid on;
-subplot(1,3,3)
-  plot(rTR(:,2),rTR(:,3),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
-
-% 3b) YA + Linear + Truth — Position 3D
-figure('Name','δa = –100 m: All Three (3D Pos)','NumberTitle','off');
-plot3(rTR(:,1),rTR(:,2),rTR(:,3),'c', 'LineWidth', 1.0); hold on;
-plot3(rYA(:,1),rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0);
-plot3(rLIN(:,1),rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-legend('Non. Linear Diff. Eq. ','YA','Geo. Map.','Location','best');
-axis equal; grid on; view(3);
+subplot(2,2,4)
+plot3(TDX_RTN_2(:,1), TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+hold on
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3))
+plot3(r_RTN_lin(:,2), r_RTN_lin(:,2), r_RTN_lin(:,3))
+xlabel('R Position [m]')
+ylabel('T Position [m]')
+zlabel('N Position [m]')
+grid on
+axis equal
+view(3)
 
 % ii) Problem 2 but with e > 0.5
 
@@ -633,8 +741,8 @@ a_TDX_init_2 =  6886536.686; % still same semi-major axis
 e_TDX_init_2 = 0.6;
 i_TDX_init_2 = deg2rad(97.4454);
 RAAN_TDX_init_2 = deg2rad(351.0106);
-omega_TDX_init_2 = deg2rad(-100.5043);
-M_TDX_init_2 = deg2rad(201.086+12.35936); % added 0.0001
+omega_TDX_init_2 = deg2rad(101.2452);
+M_TDX_init_2 = deg2rad(11.6530); % added 0.0001
 
 
 %initial cheif rv
@@ -662,7 +770,7 @@ p  = a_TSX_init_2 * (1 - e_TSX_init_2^2);
 r0  = p / (1 + e_TSX_init_2 * cos(nu_TSX_init_2));
 ratio = ro_init / r_peri; 
 
-fprintf('\nPart i-ii Relevant Initial Orbital Elements for TH Formulation\n');
+fprintf('\nRelevant Initial Orbital Elements for TH Formulation\n');
 fprintf('---------------------------------------------------\n');
 fprintf('Initial Minimum Distance      : %.15f m\n', r_peri);
 fprintf('Initial Relative Distance       : %.15f m\n', ro_init);
@@ -683,7 +791,7 @@ r0   = p / (1 + e*cos(f0));
 
 Ks = getYAconstants(rv_rel_init_RTN_2, a, e, f0);
 
-fprintf('\nPart i-ii YA Integration Constants:\n');
+fprintf('\nYA Integration Constants:\n');
 fprintf('-------------------------\n');
 for ii = 1:6
     fprintf('K%d = %12.6e\n', ii, Ks(ii));
@@ -720,6 +828,25 @@ for k = 1:N
     v_RTN(k,:) = (X(4:6)' * r0) * fdot;
 end
 
+figure;
+subplot(3,1,1)
+plot(t_orbit, r_RTN(:,1)), xlabel('Orbits'), ylabel('R [m]'), grid on
+subplot(3,1,2)
+plot(t_orbit, r_RTN(:,2)), xlabel('Orbits'), ylabel('T [m]'), grid on
+subplot(3,1,3)
+plot(t_orbit, r_RTN(:,3)), xlabel('Orbits'), ylabel('N [m]'), grid on
+
+figure;
+subplot(2,2,1)
+plot(r_RTN(:,2), r_RTN(:,1)), xlabel('T [m]'), ylabel('R [m]'), grid on
+subplot(2,2,2)
+plot(r_RTN(:,3), r_RTN(:,1)), xlabel('N [m]'), ylabel('R [m]'), grid on
+subplot(2,2,3)
+plot(r_RTN(:,2), r_RTN(:,3)), xlabel('T [m]'), ylabel('N [m]'), grid on
+subplot(2,2,4)
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3))
+xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]'),
+axis equal, view(3), grid on
 
 da = (a_TDX_init_2 - a_TSX_init_2) / a_TSX_init_2;
 dlambda = (M_TDX_init_2 + omega_TDX_init_2) - (M_TSX_init_2 + omega_TSX_init_2) + (RAAN_TDX_init_2 - RAAN_TSX_init_2)*cos(i_TSX_init_2);
@@ -730,7 +857,7 @@ di_y = (RAAN_TDX_init_2 - RAAN_TSX_init_2)*sin(i_TSX_init_2);
 
 
 % Print ROEs for June 21, 2010
-fprintf('\n Part i-ii nRelative Quasi-Nonsingular Orbit Elements:\n');
+fprintf('\nRelative Quasi-Nonsingular Orbit Elements:\n');
 fprintf('---------------------------------------------------\n');
 fprintf('Relative Semi-Major Axis      : %.15f \n', da);
 fprintf('Relative Lambda       : %.15f \n', dlambda);
@@ -753,116 +880,136 @@ t_grid  = linspace(t_start, t_end, N).';
 
 [r_RTN_lin, v_RTN_lin] = propagateLinearEcc(roe_qns, chief_oe, t_grid, tol);
 
+figure;
 
-% h) nonlinear equations propagation
+% R‐component
+subplot(3,1,1)
+plot(t_orbit, r_RTN(:,1),'b--', 'DisplayName','YA'); hold on;
+plot(t_orbit, r_RTN_lin(:,1),'r-',  'DisplayName','Linear');
+ylabel('R [m]'); legend('Location','best'); grid on
+
+% T‐component
+subplot(3,1,2)
+plot(t_orbit, r_RTN(:,2),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,2),'r-');
+ylabel('T [m]'); grid on
+
+% N‐component
+subplot(3,1,3)
+plot(t_orbit, r_RTN(:,3),'b--'); hold on;
+plot(t_orbit, r_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('N [m]'); grid on
+
+
+figure;
+
+% Ṙ‐component
+subplot(3,1,1)
+plot(t_orbit, v_RTN(:,1),'b--','DisplayName','YA'); hold on;
+plot(t_orbit, v_RTN_lin(:,1),'r-','DisplayName','Linear');
+ylabel('Ṙ [m/s]'); legend('Location','best'); grid on
+
+% Ṫ‐component
+subplot(3,1,2)
+plot(t_orbit, v_RTN(:,2),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,2),'r-');
+ylabel('Ṫ [m/s]'); grid on
+
+% Ṅ‐component
+subplot(3,1,3)
+plot(t_orbit, v_RTN(:,3),'b--'); hold on;
+plot(t_orbit, v_RTN_lin(:,3),'r-');
+xlabel('Orbits'); ylabel('Ṅ [m/s]'); grid on
+
+figure;
+
+subplot(2,2,1)
+plot(r_RTN(:,2), r_RTN(:,1), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,1), 'r-')
+xlabel('T [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,2)
+plot(r_RTN(:,3), r_RTN(:,1), 'b--'); hold on; 
+plot(r_RTN_lin(:,3), r_RTN_lin(:,1), 'r-')
+xlabel('N [m]'), ylabel('R [m]'), grid on
+
+subplot(2,2,3)
+plot(r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot(r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('T [m]'), ylabel('N [m]'), grid on
+
+subplot(2,2,4)
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3), 'b--'); hold on;
+plot3(r_RTN_lin(:,1), r_RTN_lin(:,2), r_RTN_lin(:,3), 'r-')
+xlabel('R [m]'), ylabel('T [m]'), zlabel('N [m]')
+axis equal, grid on, view(3)
 
 [t_out, TDX_RTN_2] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [t_start, t_end]', [rv_rel_init_RTN_2; rv_TSX_init_2], t_int);
-
-% check rho ratio throughout entire diff eq simulation: 
-
-r_rel = TDX_RTN_2(:,1:3);            % [m] (N×3)
-
-% preallocate
-Npts = numel(t_out);
-r_chief = zeros(Npts,1);
-
-for k = 1:Npts
-    Mk = M0 + n * t_out(k);
-    Ek = mean2ecc(Mk, e, tol);
-    fk = ecc2true(Ek, e);
-    r_chief(k) = p / (1 + e*cos(fk));    % [m]
-end
-
-% 3) compute the ratio vector and its average
-rho    = vecnorm(r_rel, 2, 2);          % ||relative|| [m]
-ratio  = rho ./ r_chief;                % dimensionless
-ratio_avg = mean(ratio);
-
-fprintf('\n Part i-ii Nonlinear Trajectory Separation Check\n');
-fprintf('-------------------------------------\n');
-fprintf('Mean ||ρ||/r_c  = %.3e (should be ≲1e–3)\n', ratio_avg);
-fprintf('Max  ||ρ||/r_c  = %.3e\n', max(ratio));
-fprintf('Min  ||ρ||/r_c  = %.3e\n', min(ratio));
-
  
-% convert to km / km-s
-rYA   = r_RTN       / 1e3;         % [km]
-rLIN  = r_RTN_lin   / 1e3;         % [km]
-rTR   = TDX_RTN_2(:,1:3) / 1e3;    % [km]
+figure;
+subplot(3,1,1)
+plot(t_orbit, TDX_RTN_2(:,1));
+hold on
+plot(t_orbit, r_RTN(:,1))
+plot(t_orbit, r_RTN_lin(:,1))
+xlabel('Orbits');
+ylabel('R Position [m]');
+grid on;
 
-%vTR   = TDX_RTN_2(:,4:6);    % [m/s]
+subplot(3,1,2)
+plot(t_orbit, TDX_RTN_2(:,2));
+hold on
+plot(t_orbit, r_RTN(:,2))
+plot(t_orbit, r_RTN_lin(:,2))
+xlabel('Orbits');
+ylabel('T Position [m]');
+grid on;
 
+subplot(3,1,3)
+plot(t_orbit, TDX_RTN_2(:,3));
+hold on
+plot(t_orbit, r_RTN(:,3))
+plot(t_orbit, r_RTN_lin(:,3))
+xlabel('Orbits');
+ylabel('N Position [m]');
+grid on;
 
-% 1) YA only — Position Planes
-figure('Name','e = 0.6: YA Only (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rYA(:,2), rYA(:,1), 'r', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,2)
-  plot(rYA(:,3), rYA(:,1), 'r', 'LineWidth', 1.0);
-  xlabel('N [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,3)
-  plot(rYA(:,2), rYA(:,3), 'r', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
+figure;
+subplot(2,2,1)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,1))
+hold on
+plot(r_RTN(:,2), r_RTN(:,1))
+plot(r_RTN_lin(:,2), r_RTN_lin(:,1))
+xlabel('T Position [m]')
+ylabel('R Position [m]')
+grid on
 
-% 1b) YA only — Position 3D
-figure('Name','e = 0.6: YA Only (3D Pos)','NumberTitle','off');
-plot3(rYA(:,1), rYA(:,2), rYA(:,3), 'r', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-axis equal; grid on; view(3);
+subplot(2,2,2)
+plot(TDX_RTN_2(:,3), TDX_RTN_2(:,1))
+hold on
+plot(r_RTN(:,3), r_RTN(:,1))
+plot(r_RTN_lin(:,3), r_RTN_lin(:,1))
+xlabel('N Position [m]')
+ylabel('R Position [m]')
+grid on
 
+subplot(2,2,3)
+plot(TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+hold on
+plot(r_RTN(:,2), r_RTN(:,3))
+plot(r_RTN_lin(:,2), r_RTN_lin(:,3))
+xlabel('T Position [m]')
+ylabel('N Position [m]')
+grid on
 
-
-% 2) YA + Linear — Position Planes
-figure('Name','e = 0.6: YA vs Linear (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rYA(:,2), rYA(:,1),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,2),rLIN(:,1),'b', 'LineWidth', 1.0); 
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-  legend('YA','Geo. Map.','Location','best');
-subplot(1,3,2)
-  plot(rYA(:,3), rYA(:,1),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,3),rLIN(:,1),'b', 'LineWidth', 1.0); 
-  xlabel('N [km]'); ylabel('R [km]'); grid on;
-subplot(1,3,3)
-  plot(rYA(:,2), rYA(:,3),'r', 'LineWidth', 1.0); hold on;
-  plot(rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0); 
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
-
-% 2b) YA + Linear — Position 3D
-figure('Name','e = 0.6: YA vs Linear (3D Pos)','NumberTitle','off');
-plot3(rYA(:,1),rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0); hold on;
-plot3(rLIN(:,1),rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-legend('YA','Geo. Map.','Location','best'); axis equal; grid on; view(3);
-
-
-
-
-% 3) YA + Linear + Truth — Position Planes
-figure('Name','e = 0.6: All Three (Pos)','NumberTitle','off');
-subplot(1,3,1)
-  plot(rTR(:,2),rTR(:,1),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,2),rYA(:,1),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,2),rLIN(:,1),'b', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('R [km]'); grid on;
-  legend('Non. Linear Diff. Eq. ','YA','Geo. Map.','Location','best');
-subplot(1,3,2)
-  plot(rTR(:,3),rTR(:,1),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,3),rYA(:,1),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,3),rLIN(:,1),'b', 'LineWidth', 1.0);
-  xlabel('N [km]'); ylabel('R [km]');grid on;
-subplot(1,3,3)
-  plot(rTR(:,2),rTR(:,3),'c', 'LineWidth', 1.0); hold on;
-  plot(rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0);
-  plot(rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-  xlabel('T [km]'); ylabel('N [km]'); grid on;
-
-% 3b) YA + Linear + Truth — Position 3D
-figure('Name','e = 0.6: All Three (3D Pos)','NumberTitle','off');
-plot3(rTR(:,1),rTR(:,2),rTR(:,3),'c', 'LineWidth', 1.0); hold on;
-plot3(rYA(:,1),rYA(:,2),rYA(:,3),'r', 'LineWidth', 1.0);
-plot3(rLIN(:,1),rLIN(:,2),rLIN(:,3),'b', 'LineWidth', 1.0);
-xlabel('R [km]'); ylabel('T [km]'); zlabel('N [km]');
-legend('Non. Linear Diff. Eq. ','YA','Geo. Map.','Location','best');
-axis equal; grid on; view(3);
+subplot(2,2,4)
+plot3(TDX_RTN_2(:,1), TDX_RTN_2(:,2), TDX_RTN_2(:,3))
+hold on
+plot3(r_RTN(:,1), r_RTN(:,2), r_RTN(:,3))
+plot3(r_RTN_lin(:,2), r_RTN_lin(:,2), r_RTN_lin(:,3))
+xlabel('R Position [m]')
+ylabel('T Position [m]')
+zlabel('N Position [m]')
+grid on
+axis equal
+view(3)
