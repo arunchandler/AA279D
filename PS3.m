@@ -31,10 +31,10 @@ u_TSX_init = nu_TSX_init + omega_TSX_init;
 %initial deputy elements
 a_TDX_init =  6886536.686;
 e_TDX_init = 0.0001269;
-i_TDX_init = deg2rad(97.4454);
+i_TDX_init = deg2rad(97.4554);
 RAAN_TDX_init = deg2rad(351.0106);
 omega_TDX_init = deg2rad(-100.5043);
-M_TDX_init = deg2rad(201.086+12.35936); % added 0.0001
+M_TDX_init = deg2rad(201.086+12.34926);
 
 global n
 
