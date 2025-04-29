@@ -61,12 +61,13 @@ function params = rv2oe(X, mu)
     end
 
     % Rotation matrix from perifocal to inertial frame
-    R_p2i = [ cos(RAAN)*cos(omega) - sin(RAAN)*sin(omega)*cos(i), -cos(RAAN)*sin(omega) - sin(RAAN)*cos(omega)*cos(i), sin(RAAN)*sin(i);
-              sin(RAAN)*cos(omega) + cos(RAAN)*sin(omega)*cos(i), -sin(RAAN)*sin(omega) + cos(RAAN)*cos(omega)*cos(i), -cos(RAAN)*sin(i);
-              sin(omega)*sin(i),                                 cos(omega)*sin(i),                                  cos(i) ];
+    %R_p2i = [ cos(RAAN)*cos(omega) - sin(RAAN)*sin(omega)*cos(i), -cos(RAAN)*sin(omega) - sin(RAAN)*cos(omega)*cos(i), sin(RAAN)*sin(i);
+    %          sin(RAAN)*cos(omega) + cos(RAAN)*sin(omega)*cos(i), -sin(RAAN)*sin(omega) + cos(RAAN)*cos(omega)*cos(i), -cos(RAAN)*sin(i);
+    %          sin(omega)*sin(i),                                 cos(omega)*sin(i),                                  cos(i) ];
 
-    e_vec_perifocal = (R_p2i') .* e_vec;
-    e_vec_perifocal = e_vec_perifocal(1:2); % Only x and y components in perifocal frame
+    %e_vec_perifocal = (R_p2i') .* e_vec;
+    %e_vec_perifocal = e_vec_perifocal(1:2); % Only x and y components in perifocal frame
+    e_vec_perifocal = [e*cos(omega), e*sin(omega)];
 
-    params = [a, e, i, RAAN, omega, nu, energy, h, e_vec_perifocal];
+    params = [a, e, wrapTo2Pi(i), wrapTo2Pi(RAAN), wrapTo2Pi(omega), wrapTo2Pi(nu), energy, h, e_vec_perifocal];
 end

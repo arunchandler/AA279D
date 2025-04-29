@@ -4,7 +4,7 @@ function deputyOE = qns2oe(chiefOE, dqns)
 %  deputyOE = qns2oe(chiefOE, dqns) returns the deputy's classical orbital
 %  elements [a; e; i; Omega; omega; M] given
 %    chiefOE = [a_c; e_c; i_c; Omega_c; omega_c; M_c]
-%    dqns    = [delta_a; delta_lambda; delta_ex; delta_ey; delta_ix; delta_iy]
+%    dqns    = a_c*[delta_a; delta_lambda; delta_ex; delta_ey; delta_ix; delta_iy]
 %
 %  Equations used:
 %    a_d   = a_c*(1 + da)

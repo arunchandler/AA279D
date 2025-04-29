@@ -9,7 +9,7 @@
 
 function M = ecc2mean(E, e)
 
-E = mod(E, 2*pi);
+E = wrapTo2Pi(E);
 
 % Kepler's equation
 M = E - e*sin(E);
