@@ -565,40 +565,176 @@ end
 
 %Part f) Change on initial relative orbital elements & maneuver
 
+%based on the dlambda' equation from Lecture 5/6 
+% dlambda' = -21/2(gamma*sin(2i)*dix+1/7*da)
+% for no drift in dlambda, we want dix = 0
+% We change dix to 0 degrees
+% To subtract 30 degrees from inclination, we use:
+% dv = sqrt( 2v^2 - 4v*cos(i) )
+% direction will be anti normal at u=0 or normal at u=180
+
+a_TDX_f =  6886536.686;
+e_TDX_f = 0.0001269;
+i_TDX_f = deg2rad(97.4554);
+RAAN_TDX_f = deg2rad(351.0106);
+omega_TDX_f = deg2rad(-100.5043);
+M_TDX_f = wrapTo2Pi(2*pi - omega_TDX_f);
+u_TDX_f = omega_TDX_f + M_TDX_f %should be 0
+
+TDX_oe_f = [a_TDX_f, e_TDX_f, i_TDX_f, RAAN_TDX_f, omega_TDX_f, M_TDX_f];
+TDX_rv_f = oe2rv(TDX_oe_f, mu);
+
+v = norm(TDX_rv_f(4:6));
+dv = sqrt(2*v^2 - 4*v*cosd(30))
 
 
-%Part g) Propagation with new qns roe
-rel_qns_f = [0, 0, 50, 100, 0, 200];
-TDX_init_oe_f = qns2oe(TSX_init_oe_2, rel_qns_f)
-TDX_init_osc_oe_f = TDX_init_oe_f;
-TDX_init_rv_f = oe2rv(TDX_init_osc_oe_f, mu)
+% Part g) Propagation with new qns roe
+rel_qns_g       = [0, 100, 50, 100, 0, 200];
+TDX_init_oe_g   = qns2oe(TSX_init_oe_2, rel_qns_g);
+TDX_init_osc_oe_g = TDX_init_oe_g;
+TDX_init_rv_g   = oe2rv(TDX_init_osc_oe_g, mu);
 
-[t_out, TDX_rv_f] = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', TDX_init_rv_f, dt);
-[t_out, TDX_rv_J2_f] = ode4(@compute_rates_rv_perturbed, [tstart, tend]', TDX_init_rv_f, dt);
+[t_out, TDX_rv_g]    = ode4(@compute_rates_rv_unperturbed, [tstart, tend]', TDX_init_rv_g, dt);
+[t_out, TDX_rv_J2_g] = ode4(@compute_rates_rv_perturbed,   [tstart, tend]', TDX_init_rv_g, dt);
 
-rtn_out_f = zeros(num_points,3);
-rtn_out_J2_f = zeros(num_points,3);
+rtn_out_g      = zeros(num_points,3);
+rtn_out_J2_g   = zeros(num_points,3);
+TDX_osc_oe_g   = zeros(num_points,6);
+TDX_mean_oe_g  = zeros(num_points,6);
+rel_osc_g      = zeros(num_points,6);
+rel_mean_g     = zeros(num_points,6);
 
 for idx = 1:num_points
-    state1 = eci2rtn(TSX_rv_2(idx,:)', TDX_rv_f(idx,:)');
-    rtn_out_f(idx,:) = state1(1:3)';
-    state2 = eci2rtn(TSX_rv_J2_2(idx,:)', TDX_rv_J2_f(idx,:)');
-    rtn_out_J2_f(idx,:) = state2(1:3)';
+
+    state1 = eci2rtn(TSX_rv_2(idx,:)', TDX_rv_g(idx,:)');
+    rtn_out_g(idx,:) = state1(1:3)';
+    state2 = eci2rtn(TSX_rv_J2_2(idx,:)', TDX_rv_J2_g(idx,:)');
+    rtn_out_J2_g(idx,:) = state2(1:3)';
+
+    TSX_params_J2_2   = rv2oe(TSX_rv_J2_2(idx,:), mu);
+    TDX_params_J2_2   = rv2oe(TDX_rv_J2_g(idx,:), mu);
+
+    a_TSX_J2_2       = TSX_params_J2_2(1);
+    e_TSX_J2_2       = TSX_params_J2_2(2);
+    i_TSX_J2_2       = TSX_params_J2_2(3);
+    RAAN_TSX_J2_2    = TSX_params_J2_2(4);
+    omega_TSX_J2_2   = TSX_params_J2_2(5);
+    nu_TSX_J2_2      = TSX_params_J2_2(6);
+    e_vec_TSX_J2_2   = TSX_params_J2_2(11:12);
+    M_TSX_J2_2       = true2mean(nu_TSX_J2_2, e_TSX_J2_2);
+    u_TSX_J2_2       = M_TSX_J2_2 + omega_TSX_J2_2;
+    TSX_J2_osc_2(idx,:)= [a_TSX_J2_2, e_vec_TSX_J2_2(:)', i_TSX_J2_2, ...
+                          RAAN_TSX_J2_2, u_TSX_J2_2];
+
+    TSX_J2_mean_oe_2  = osc2mean([a_TSX_J2_2, e_TSX_J2_2, i_TSX_J2_2, ...
+                                 RAAN_TSX_J2_2, omega_TSX_J2_2, M_TSX_J2_2],1)'; %1 for J2
+    a_TSX_J2_mean_2   = TSX_J2_mean_oe_2(1);
+    e_TSX_J2_mean_2   = TSX_J2_mean_oe_2(2);
+    i_TSX_J2_mean_2   = TSX_J2_mean_oe_2(3);
+    RAAN_TSX_J2_mean_2= wrapTo2Pi(TSX_J2_mean_oe_2(4));
+    omega_TSX_J2_mean_2=wrapTo2Pi(TSX_J2_mean_oe_2(5));
+    M_TSX_J2_mean_2   = TSX_J2_mean_oe_2(6);
+    ex_TSX_J2_mean_2  = e_TSX_J2_mean_2*cos(omega_TSX_J2_mean_2);
+    ey_TSX_J2_mean_2  = e_TSX_J2_mean_2*sin(omega_TSX_J2_mean_2);
+    u_TSX_J2_mean_2   = M_TSX_J2_mean_2 + omega_TSX_J2_mean_2;
+    TSX_J2_mean_2(idx,:)= [a_TSX_J2_mean_2, ex_TSX_J2_mean_2, ey_TSX_J2_mean_2, ...
+                           i_TSX_J2_mean_2, RAAN_TSX_J2_mean_2, u_TSX_J2_mean_2];
+
+    a_TDX_J2_2       = TDX_params_J2_2(1);
+    e_TDX_J2_2       = TDX_params_J2_2(2);
+    i_TDX_J2_2       = TDX_params_J2_2(3);
+    RAAN_TDX_J2_2    = TDX_params_J2_2(4);
+    omega_TDX_J2_2   = TDX_params_J2_2(5);
+    nu_TDX_J2_2      = TDX_params_J2_2(6);
+    e_vec_TDX_J2_2   = TDX_params_J2_2(11:12);
+    M_TDX_J2_2       = true2mean(nu_TDX_J2_2, e_TDX_J2_2);
+    u_TDX_J2_2       = M_TDX_J2_2 + omega_TDX_J2_2;
+    TDX_osc_oe_g(idx,:)= [a_TDX_J2_2, e_vec_TDX_J2_2(:)', i_TDX_J2_2, ...
+                          RAAN_TDX_J2_2, u_TDX_J2_2];
+
+    TDX_J2_mean_oe_2  = osc2mean([a_TDX_J2_2, e_TDX_J2_2, i_TDX_J2_2, ...
+                                 RAAN_TDX_J2_2, omega_TDX_J2_2, M_TDX_J2_2],1)'; %1 for J2
+    a_TDX_J2_mean_2   = TDX_J2_mean_oe_2(1);
+    e_TDX_J2_mean_2   = TDX_J2_mean_oe_2(2);
+    i_TDX_J2_mean_2   = TDX_J2_mean_oe_2(3);
+    RAAN_TDX_J2_mean_2= wrapTo2Pi(TDX_J2_mean_oe_2(4));
+    omega_TDX_J2_mean_2=wrapTo2Pi(TDX_J2_mean_oe_2(5));
+    M_TDX_J2_mean_2   = TDX_J2_mean_oe_2(6);
+    ex_TDX_J2_mean_2  = e_TDX_J2_mean_2*cos(omega_TDX_J2_mean_2);
+    ey_TDX_J2_mean_2  = e_TDX_J2_mean_2*sin(omega_TDX_J2_mean_2);
+    u_TDX_J2_mean_2   = M_TDX_J2_mean_2 + omega_TDX_J2_mean_2;
+    TDX_mean_oe_g(idx,:)= [a_TDX_J2_mean_2, ex_TDX_J2_mean_2, ey_TDX_J2_mean_2, ...
+                           i_TDX_J2_mean_2, RAAN_TDX_J2_mean_2, u_TDX_J2_mean_2];
+
+    rel_osc_g(idx,:)= a_TSX_J2_2*compute_roes(a_TSX_J2_2, i_TSX_J2_2, e_TSX_J2_2, ...
+                                          RAAN_TSX_J2_2, u_TSX_J2_2, ...
+                                          a_TDX_J2_2, i_TDX_J2_2, e_TDX_J2_2, ...
+                                          RAAN_TDX_J2_2, u_TDX_J2_2);
+    rel_mean_g(idx,:)=a_TSX_J2_mean_2*compute_roes(a_TSX_J2_mean_2, i_TSX_J2_mean_2, e_TSX_J2_mean_2, ...
+                                          RAAN_TSX_J2_mean_2, u_TSX_J2_mean_2, ...
+                                          a_TDX_J2_mean_2, i_TDX_J2_mean_2, e_TDX_J2_mean_2, ...
+                                          RAAN_TDX_J2_mean_2, u_TDX_J2_mean_2);
+
 end
 
-R_f   = rtn_out_f(:,1);
-T_f   = rtn_out_f(:,2);
-N_f   = rtn_out_f(:,3);
+%–– Pull out each relative QNS component as before
+ada_osc_g         = rel_osc_g(:,1);
+adlambda_osc_g    = rel_osc_g(:,2);
+adex_osc_g        = rel_osc_g(:,3);
+adey_osc_g        = rel_osc_g(:,4);
+adix_osc_g        = rel_osc_g(:,5);
+adiy_osc_g        = rel_osc_g(:,6);
 
-R_J2 = rtn_out_J2_f(:,1);
-T_J2 = rtn_out_J2_f(:,2);
-N_J2 = rtn_out_J2_f(:,3);
+ada_mean_g        = rel_mean_g(:,1);
+adlambda_mean_g   = rel_mean_g(:,2);
+adex_mean_g       = rel_mean_g(:,3);
+adey_mean_g       = rel_mean_g(:,4);
+adix_mean_g       = rel_mean_g(:,5);
+adiy_mean_g       = rel_mean_g(:,6);
+
+figure;
+plot(adex_osc_g, adey_osc_g, '-'   , 'DisplayName','Osculating');
+hold on;
+plot(adex_mean_g, adey_mean_g, '--', 'DisplayName','Mean');
+axis equal;
+xlabel('a\deltae_x [m]');
+ylabel('a\deltae_y [m]');
+legend('Location','best');
+grid on;
+
+figure;
+plot(adix_osc_g, adiy_osc_g, '-'   , 'DisplayName','Osculating');
+hold on;
+plot(adix_mean_g, adiy_mean_g, '--', 'DisplayName','Mean');
+axis equal;
+xlabel('a\deltai_x [m]');
+ylabel('a\deltai_y [m]');
+legend('Location','best');
+grid on;
+
+figure;
+plot(adlambda_osc_g, ada_osc_g,'-'   , 'DisplayName','Osculating');
+hold on;
+plot(adlambda_mean_g, ada_mean_g,'--', 'DisplayName','Mean');
+axis equal;
+ylabel('a\deltaa [m]');
+xlabel('a\delta\lambda [m]');
+legend('Location','best');
+grid on;
+
+R_g   = rtn_out_g(:,1);
+T_g   = rtn_out_g(:,2);
+N_g   = rtn_out_g(:,3);
+
+R_J2 = rtn_out_J2_g(:,1);
+T_J2 = rtn_out_J2_g(:,2);
+N_J2 = rtn_out_J2_g(:,3);
 
 figure;
 
 % TR plane
 subplot(1,3,1);
-plot(T_f,   R_f,   '-',  T_J2,   R_J2,   '--');
+plot(T_g,   R_g,   '-',  T_J2,   R_J2,   '--');
 xlabel('T [m]');    ylabel('R [m]');
 axis equal;         grid on;
 title('TR Plane');
@@ -606,7 +742,7 @@ legend('Unperturbed','J2 Perturbed');
 
 % NR plane
 subplot(1,3,2);
-plot(N_f,   R_f,   '-',  N_J2,   R_J2,   '--');
+plot(N_g,   R_g,   '-',  N_J2,   R_J2,   '--');
 xlabel('N [m]');    ylabel('R [m]');
 axis equal;         grid on;
 title('NR Plane');
@@ -614,17 +750,74 @@ legend('Unperturbed','J2 Perturbed');
 
 % TN plane
 subplot(1,3,3);
-plot(T_f,   N_f,   '-',  T_J2,   N_J2,   '--');
+plot(T_g,   N_g,   '-',  T_J2,   N_J2,   '--');
 xlabel('T [m]');    ylabel('N [m]');
 axis equal;         grid on;
 title('TN Plane');
 legend('Unperturbed','J2 Perturbed');
 
 figure;
-plot3( R_f,  T_f,  N_f,  '-',  R_J2,  T_J2,  N_J2,  '--');
+plot3( R_g,  T_g,  N_g,  '-',  R_J2,  T_J2,  N_J2,  '--');
 xlabel('R [m]');    ylabel('T [m]');    zlabel('N [m]');
 axis equal;         grid on;
 title('3D RTN Trajectories');
 legend('Unperturbed','J2 Perturbed');
 
+
 %Part h)
+
+roes_2_h = zeros(num_points,6);
+roes_6_h = zeros(num_points,6);
+roes_2_h(1,:) = rel_qns;
+roes_6_h(1,:) = rel_qns_g;
+
+for idx = 2:num_points
+
+    oe = TSX_J2_mean_2(idx,:);
+    phi = stm_qns_j2(dt, oe);
+    roes_2_h(idx,:) = (phi*roes_2_h(idx-1,:)');
+    roes_6_h(idx,:) = (phi*roes_6_h(idx-1,:)');
+
+end
+
+figure;
+plot(roes_2_h(:,3), roes_2_h(:,4), '-');
+axis equal; grid on;
+hold on;
+xlabel('a\deltae_x [m]'); ylabel('a\deltae_y [m]');
+title('Initial Conditions from (2)');
+
+figure;
+plot(roes_6_h(:,3), roes_6_h(:,4), '-');
+axis equal; grid on;
+hold on;
+xlabel('a\deltae_x [m]'); ylabel('a\deltae_y [m]');
+title('Initial Conditions from (6)');
+
+figure;
+plot(roes_2_h(:,5), roes_2_h(:,6), '-');
+axis equal; grid on;
+hold on;
+xlabel('a\deltai_x [m]'); ylabel('a\deltai_y [m]');
+title('Initial Conditions from (2)');
+
+figure;
+plot(roes_6_h(:,5), roes_6_h(:,6), '-');
+axis equal; grid on;
+hold on;
+xlabel('a\deltai_x [m]'); ylabel('a\deltai_y [m]');
+title('Initial Conditions from (6)');
+
+figure;
+plot(roes_2_h(:,2), roes_2_h(:,1), '-');
+axis equal; grid on;
+hold on;
+xlabel('a\delta\lambda [m]'); ylabel('a\deltaa [m]');
+title('Initial Conditions from (2)');
+
+figure;
+plot(roes_6_h(:,2), roes_6_h(:,1), '-');
+axis equal; grid on;
+hold on;
+xlabel('a\delta\lambda [m]'); ylabel('a\deltaa [m]');
+title('Initial Conditions from (6)');
