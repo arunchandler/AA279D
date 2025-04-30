@@ -32,10 +32,10 @@ fprintf('\n===== Case B: delta_a = -100 m, ecc≈0 =====\n');
 a_caseB    = 6886536.686;     ecc_caseB   = 0.1;
 inc_caseB  = deg2rad(97.4453); raan_caseB  = deg2rad(351.0108);
 argp_caseB = deg2rad(101.2452); M_caseB    = deg2rad(11.6520);
-a_depB     = a_caseB - 100;    ecc_depB    = 0.1;
+a_depB     = a_caseB - 100;    ecc_depB    = 0.1 + 5e-6;
 inc_depB   = deg2rad(97.4454); raan_depB   = deg2rad(351.0106);
-argp_depB  = deg2rad(-100.5043);
-M_depB     = deg2rad(201.086 + 12.35936);
+argp_depB  = deg2rad(101.2453);
+M_depB     = deg2rad(11.6520);
 
 [rYA_B, rLIN_B, rTR_B, vYA_B, vLIN_B, vTR_B, t_orbit_B] = run_case( ...
   a_caseB,ecc_caseB,inc_caseB,raan_caseB,argp_caseB,M_caseB, ...
@@ -51,10 +51,10 @@ fprintf('\n===== Case C: ecc = 0.6, delta_a = 0 =====\n');
 a_caseC    = 6886536.686;     ecc_caseC   = 0.6;
 inc_caseC  = deg2rad(97.4453); raan_caseC  = deg2rad(351.0108);
 argp_caseC = deg2rad(101.2452); M_caseC    = deg2rad(11.6520);
-a_depC     = a_caseC;         ecc_depC    = 0.6;
+a_depC     = a_caseC;         ecc_depC    = 0.6 + 5e-6;
 inc_depC   = deg2rad(97.4454); raan_depC   = deg2rad(351.0106);
-argp_depC  = deg2rad(100.5043);
-M_depC     = deg2rad(12.35936);
+argp_depC  = deg2rad(101.2452);
+M_depC     = deg2rad(11.6520);
 
 [rYA_C, rLIN_C, rTR_C, vYA_C, vLIN_C, vTR_C, t_orbit_C] = run_case( ...
   a_caseC,ecc_caseC,inc_caseC,raan_caseC,argp_caseC,M_caseC, ...
@@ -197,25 +197,25 @@ function plot_all(rYA,rLIN,rTR, vYA,vLIN,vTR, t_orbit, titleStr)
     plot(rYA(:,2),rYA(:,1),'r-','LineWidth',1.0); hold on;
     plot(rLIN(:,2),rLIN(:,1),'b:','LineWidth',1.0);
     plot(rTR(:,2),rTR(:,1),'c:','LineWidth',1.0);
-    grid on;  xlabel('T [m]'); ylabel('R [m]');
+    grid on; axis equal;  xlabel('T [m]'); ylabel('R [m]');
     legend('YA','Geo Map','Diff eq','Location','best');
   subplot(1,3,2)
     plot(rYA(:,3),rYA(:,1),'r-','LineWidth',1.0); hold on;
     plot(rLIN(:,3),rLIN(:,1),'b:','LineWidth',1.0);
     plot(rTR(:,3),rTR(:,1),'c:','LineWidth',1.0);
-    grid on;  xlabel('N [m]'); ylabel('R [m]');
+    grid on; axis equal;  xlabel('N [m]'); ylabel('R [m]');
   subplot(1,3,3)
     plot(rYA(:,2),rYA(:,3),'r-','LineWidth',1.0); hold on;
     plot(rLIN(:,2),rLIN(:,3),'b:','LineWidth',1.0);
     plot(rTR(:,2),rTR(:,3),'c:','LineWidth',1.0);
-    grid on;  xlabel('T [m]'); ylabel('N [m]');
+    grid on; axis equal;  xlabel('T [m]'); ylabel('N [m]');
 
   %% 2) all three overlay—3D
   figure('Name',[titleStr '—All 3 (3D)'],'NumberTitle','off');
   plot3(rYA(:,1),rYA(:,2),rYA(:,3),'r-','LineWidth',1.0); hold on;
   plot3(rLIN(:,1),rLIN(:,2),rLIN(:,3),'b:','LineWidth',1.0);
   plot3(rTR(:,1),rTR(:,2),rTR(:,3),'c:','LineWidth',1.0);
-  grid on; view(3);
+  grid on; axis equal; view(3);
   xlabel('R [m]'); ylabel('T [m]'); zlabel('N [m]');
   legend('YA','Geo Map','Diff eq','Location','best');
 
