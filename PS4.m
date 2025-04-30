@@ -781,43 +781,55 @@ for idx = 2:num_points
 end
 
 figure;
-plot(roes_2_h(:,3), roes_2_h(:,4), '-');
+plot(roes_2_h(:,3),  roes_2_h(:,4),          '-'); hold on;
+plot(rel_J2_osc_qns_2(:,3), rel_J2_osc_qns_2(:,4), '--');
+plot(rel_J2_mean_qns_2(:,3),rel_J2_mean_qns_2(:,4), '-.');
 axis equal; grid on;
-hold on;
-xlabel('a\deltae_x [m]'); ylabel('a\deltae_y [m]');
-title('Initial Conditions from (2)');
+xlabel('a\delta e_x [m]');
+ylabel('a\delta e_y [m]');
+legend('STM‐Propagated ROE (2)', 'J_2 Osculating QNS (6)', 'J_2 Mean QNS (6)','Location','best');
 
 figure;
-plot(roes_6_h(:,3), roes_6_h(:,4), '-');
+plot(roes_6_h(:,3),  roes_6_h(:,4),          '-'); hold on;
+plot(rel_osc_g(:,3), rel_osc_g(:,4),         '--');
+plot(rel_mean_g(:,3),rel_mean_g(:,4),        '-.');
 axis equal; grid on;
-hold on;
-xlabel('a\deltae_x [m]'); ylabel('a\deltae_y [m]');
-title('Initial Conditions from (6)');
+xlabel('a\delta e_x [m]');
+ylabel('a\delta e_y [m]');
+legend('STM‐Propagated ROE (6)', 'Osculating QNS (6)', 'Mean QNS (6)','Location','best');
 
 figure;
-plot(roes_2_h(:,5), roes_2_h(:,6), '-');
+plot(roes_2_h(:,5),  roes_2_h(:,6),          '-'); hold on;
+plot(rel_J2_osc_qns_2(:,5), rel_J2_osc_qns_2(:,6), '--');
+plot(rel_J2_mean_qns_2(:,5),rel_J2_mean_qns_2(:,6), '-.');
 axis equal; grid on;
-hold on;
-xlabel('a\deltai_x [m]'); ylabel('a\deltai_y [m]');
-title('Initial Conditions from (2)');
+xlabel('a\delta i_x [m]');
+ylabel('a\delta i_y [m]');
+legend('STM‐Propagated ROE (2)', 'Osculating QNS (2)', 'J_2 Mean QNS (2)','Location','best');
 
 figure;
-plot(roes_6_h(:,5), roes_6_h(:,6), '-');
+plot(roes_6_h(:,5),  roes_6_h(:,6),          '-'); hold on;
+plot(rel_osc_g(:,5), rel_osc_g(:,6),         '--');
+plot(rel_mean_g(:,5),rel_mean_g(:,6),        '-.');
 axis equal; grid on;
-hold on;
-xlabel('a\deltai_x [m]'); ylabel('a\deltai_y [m]');
-title('Initial Conditions from (6)');
+xlabel('a\delta i_x [m]');
+ylabel('a\delta i_y [m]');
+legend('STM‐Propagated ROE (6)', 'Osculating QNS (6)', 'Mean QNS (6)','Location','best');
 
 figure;
-plot(roes_2_h(:,2), roes_2_h(:,1), '-');
+plot(roes_2_h(:,2),  roes_2_h(:,1),          '-'); hold on;
+plot(rel_J2_osc_qns_2(:,2), rel_J2_osc_qns_2(:,1), '--');
+plot(rel_J2_mean_qns_2(:,2),rel_J2_mean_qns_2(:,1), '-.');
 axis equal; grid on;
-hold on;
-xlabel('a\delta\lambda [m]'); ylabel('a\deltaa [m]');
-title('Initial Conditions from (2)');
+xlabel('a\delta\lambda [m]');
+ylabel('a\delta a [m]');
+legend('STM‐Propagated ROE (2)', ' Osculating QNS (2)', 'Mean QNS (2)','Location','best');
 
 figure;
-plot(roes_6_h(:,2), roes_6_h(:,1), '-');
+plot(roes_6_h(:,2),  roes_6_h(:,1),          '-'); hold on;
+plot(rel_osc_g(:,2), rel_osc_g(:,1),         '--');
+plot(rel_mean_g(:,2),rel_mean_g(:,1),        '-.');
 axis equal; grid on;
-hold on;
-xlabel('a\delta\lambda [m]'); ylabel('a\deltaa [m]');
-title('Initial Conditions from (6)');
+xlabel('a\delta\lambda [m]');
+ylabel('a\delta a [m]');
+legend('STM‐Propagated ROE (6)', 'Osculating QNS (6)', 'Mean QNS (6)','Location','best');
