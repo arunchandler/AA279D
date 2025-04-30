@@ -32,10 +32,9 @@ function [rv_RTN] = propagateLinearEcc( ...
       t = t_grid(k);
 
       % 1) chief anomaly @ t
-      M = nu0 + n*t;
-      E = Newton_Raphson(M, e, 1e-5);    
-      f = 2 * atan2(sqrt(1 + e) * tan(E / 2), sqrt(1 - e));
-      f = mod(f, 2*pi);
+      M = M0 + n*t;
+      E = mean2ecc(M, e, 1e-10);    
+      f = ecc2true(E, e);         
       u = omega + f;              % true argument of latitude
 
       % 2) helper function

@@ -127,11 +127,9 @@ function [rYA, rLIN, rTR, vYA, vLIN, vTR, t_orbit] = run_case(...
   rYA = zeros(N,3); vYA = zeros(N,3);
   for k=1:N
     t    = tvec(k);
-    M    = nu0 + n*t;
-    E = Newton_Raphson(M, ecc_chief, 1e-5);
-    f = 2*atan2(sqrt(1+ecc_chief)*tan(E/2),sqrt(1-ecc_chief));
-    f = mod(f,2*pi);
-    tau = n*t/eta^3;
+    M    = M_chief + n*t;
+    f    = mean2true(M, ecc_chief, tol);
+    tau  = n*t/eta^3;
     Phi  = buildYAphi(a_chief,ecc_chief,f, tau);
     X    = Phi * Ks;
     rYA(k,:) = X(1:3)';
@@ -166,7 +164,8 @@ function [rYA, rLIN, rTR, vYA, vLIN, vTR, t_orbit] = run_case(...
 
 
   %% f) “truth” ODE & print
-  [tout, S] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [0;15*T], [rv_rel0;rvC], T/(N-1));
+  dt    = 15*T/(N-1); 
+  [tout, S] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [0;15*T], [rv_rel0;rvC], dt);
   rTR = S(:,1:3); vTR = S(:,4:6);
 
   rho = vecnorm(rTR,2,2);
