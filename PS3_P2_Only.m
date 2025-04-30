@@ -18,7 +18,7 @@ inc_depA   = deg2rad(97.4454); raan_depA   = deg2rad(351.0106);
 argp_depA  = deg2rad(101.2452);
 M_depA     = deg2rad(11.6520);
 
-[rYA_A, rLIN_A, rTR_A, vYA_A, vLIN_A, vTR_A, t_orbit_A] = run_case( ...
+[rYA_A, rLIN_A, rTR_A, vYA_A, vLIN_A, vTR_A, t_orbit_A, tvec_A] = run_case( ...
   a_caseA,ecc_caseA,inc_caseA,raan_caseA,argp_caseA,M_caseA, ...
   a_depA,ecc_depA,inc_depA,raan_depA,argp_depA,M_depA );
 
@@ -37,7 +37,7 @@ inc_depB   = deg2rad(97.4454); raan_depB   = deg2rad(351.0106);
 argp_depB  = deg2rad(101.2453);
 M_depB     = deg2rad(11.6520);
 
-[rYA_B, rLIN_B, rTR_B, vYA_B, vLIN_B, vTR_B, t_orbit_B] = run_case( ...
+[rYA_B, rLIN_B, rTR_B, vYA_B, vLIN_B, vTR_B, t_orbit_B, tvec_B] = run_case( ...
   a_caseB,ecc_caseB,inc_caseB,raan_caseB,argp_caseB,M_caseB, ...
   a_depB,ecc_depB,inc_depB,raan_depB,argp_depB,M_depB );
 
@@ -45,6 +45,11 @@ plot_all(...
   rYA_B, rLIN_B, rTR_B, ...
   vYA_B, vLIN_B, vTR_B, ...
   t_orbit_B, 'Case B: \delta a=-100 m, ecc≈0');
+
+plot_ROE_planes(tvec_B, ...
+        [a_caseB  ecc_caseB  inc_caseB  raan_caseB  argp_caseB  M_caseB], ...
+        [a_depB   ecc_depB   inc_depB   raan_depB   argp_depB   M_depB], ...
+        mu, 'Case B');
 
 %% Case C: ecc = 0.6, delta_a = 0
 fprintf('\n===== Case C: ecc = 0.6, delta_a = 0 =====\n');
@@ -56,7 +61,7 @@ inc_depC   = deg2rad(97.4454); raan_depC   = deg2rad(351.0106);
 argp_depC  = deg2rad(101.2452);
 M_depC     = deg2rad(11.6520);
 
-[rYA_C, rLIN_C, rTR_C, vYA_C, vLIN_C, vTR_C, t_orbit_C] = run_case( ...
+[rYA_C, rLIN_C, rTR_C, vYA_C, vLIN_C, vTR_C, t_orbit_C, tvec_C] = run_case( ...
   a_caseC,ecc_caseC,inc_caseC,raan_caseC,argp_caseC,M_caseC, ...
   a_depC,ecc_depC,inc_depC,raan_depC,argp_depC,M_depC );
 
@@ -67,7 +72,7 @@ plot_all(...
 
 
 %%------------------------------------------------------------------------------%%
-function [rYA, rLIN, rTR, vYA, vLIN, vTR, t_orbit] = run_case(...
+function [rYA, rLIN, rTR, vYA, vLIN, vTR, t_orbit, tvec] = run_case(...
   a_chief, ecc_chief, inc_chief, raan_chief, argp_chief, M_chief, ...
   a_deputy, ecc_deputy, inc_deputy, raan_deputy, argp_deputy, M_deputy)
 
@@ -255,4 +260,53 @@ function plot_all(rYA,rLIN,rTR, vYA,vLIN,vTR, t_orbit, titleStr)
     plot(t_orbit,errYA(:,3),'r-','LineWidth',1.0); hold on;
     plot(t_orbit,errLIN(:,3),'b:','LineWidth',1.0);
     grid on; xlabel('Orbits'); ylabel('N error [m]');
+end
+
+function plot_ROE_planes(tvec, chief_oe, dep_oe, mu, figTitle)
+
+N  = numel(tvec);
+
+% unpack osculating elements (all are scalars except tvec)
+ac = chief_oe(1);       ad = dep_oe(1);
+ec = chief_oe(2);       ed = dep_oe(2);
+ic = chief_oe(3);       id = dep_oe(3);       % id normally = ic for close pairs
+Omc= chief_oe(4);       Omd= dep_oe(4);       % RAAN Ω
+omc= chief_oe(5);       omd= dep_oe(5);       % ω
+Mc0= chief_oe(6);       Md0= dep_oe(6);       % initial mean anomalies
+
+% mean motions
+nc = sqrt(mu/ac^3);
+nd = sqrt(mu/ad^3);
+
+% time histories -----------------------------------------------
+M_c = Mc0 + nc.*tvec;          % N×1
+M_d = Md0 + nd.*tvec;
+
+% const-in-time pieces
+da      = (ad-ac)/ac;          % scalar  (stays constant)
+dex     =  ed*cos(omd) - ec*cos(omc);
+dey     =  ed*sin(omd) - ec*sin(omc);
+dix     =  id - ic;
+diy     = (Omd-Omc)*sin(ic);
+
+% dlambda evolves because M does -------------------------------
+dlamb =  (M_d + omd) - (M_c + omc) + (Omd-Omc)*cos(ic);  % N×1
+
+% -------------  plotting  --------------------------------------
+figure('Name',[figTitle ' — ROE planes'],'NumberTitle','off');
+
+subplot(1,3,1)               % δa  vs  δλ
+plot(dlamb, da*ones(N,1),'k','LineWidth',1.0);
+grid on; axis equal; xlabel('\delta\lambda [rad]'); ylabel('\delta a/a');
+title('\delta a  vs  \delta\lambda');
+
+subplot(1,3,2)               % δe_x  vs  δe_y
+plot(dex*ones(N,1), dey*ones(N,1),'k.');   % they are constants
+grid on; axis equal; xlabel('\delta e_x'); ylabel('\delta e_y');
+title('\delta e vector');
+
+subplot(1,3,3)               % δi_x  vs  δi_y
+plot(dix*ones(N,1), diy*ones(N,1),'k.');   % constants as well
+grid on; axis equal; xlabel('\delta i_x'); ylabel('\delta i_y');
+title('\delta i vector');
 end
