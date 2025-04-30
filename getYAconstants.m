@@ -14,34 +14,7 @@ function Ks = getYAconstants(rv_rel_RTN, a, e, f0)
 
     global mu;
 
-    %-- Orbit parameters --
-    p  = a * (1 - e^2);          % semi-latus rectum [m]
-    h  = sqrt(mu * p);           % specific angular momentum [m^2/s]
-
-    %-- Chief radius and anomaly-rate at f0 --
-    r0  = p / (1 + e * cos(f0)); % radius at f0 [m]
-    fdot = h / r0^2;             % df/dt [rad/s]
-
-    %-- Normalize the RTN state --
-    pos = rv_rel_RTN(1:3);       % [m]
-    vel = rv_rel_RTN(4:6);       % [m/s]
-
-    % normalized position
-    x0 = pos(1) / r0;
-    y0 = pos(2) / r0;
-    z0 = pos(3) / r0;
-
-    % convert velocity to dρ/df and normalize
-    drdf = vel ./ fdot;          % derivative w.r.t. true anomaly [m/rad]
-    xp0  = drdf(1) / r0;
-    yp0  = drdf(2) / r0;
-    zp0  = drdf(3) / r0;
-
-    X0 = [x0; y0; z0; xp0; yp0; zp0];
-
-    %-- Build Yamanaka-Ankersen transition matrix at f0 --
-
-    %--- orbit and anomaly parameters at f0 ---
+   
     eta  = sqrt(1 - e^2);
     n    = sqrt(mu/a^3);
     k    = 1 + e*cos(f0);
@@ -49,43 +22,37 @@ function Ks = getYAconstants(rv_rel_RTN, a, e, f0)
     tau  = 0;  
     % (since we're evaluating at f = f0 for the initial inversion)
 
-    %--- first- and second-derivatives ---
-    k_sin    = k*sin(f0);
-    k_cos    = k*cos(f0);
-    dk_sin   = cos(f0) + e*cos(2*f0);
-    dk_cos   = - ( sin(f0) + e*sin(2*f0) );
+    psi_x_1 = (1/k) + (3/2)*(kp*tau);
+    psi_x_2 = sin(f0);
+    psi_x_3 = cos(f0);
+    
+    psi_y_1 = (-3/2)*k*tau;
+    psi_y_2 = (1 + (1/k))*cos(f0);
+    psi_y_3 = -(1 + (1/k))*sin(f0);
+    psi_y_4 = (1/k);
 
-    Phi = zeros(6,6);
+    psi_z_5 = (1/k)*sin(f0);
+    psi_z_6 = (1/k)*cos(f0);
 
-    % row 1
-    Phi(1,1) = 1 + 1.5 * k * kp * tau;
-    Phi(1,2) = k_sin;
-    Phi(1,3) = k_cos;
+    psi_x_dot_1 = (kp/2) - (3/2)*(k^2)*(k-1)*tau;
+    psi_x_dot_2 = (k^2)*cos(f0);
+    psi_x_dot_3 = -(k^2)*sin(f0);
 
-    % row 2
-    Phi(2,1) = -1.5 * k^2 * tau;
-    Phi(2,2) = (1 + k)*cos(f0);
-    Phi(2,3) = -(1 + k)*sin(f0);
-    Phi(2,4) = 1;
+    psi_y_dot_1 = -(3/2)*(k+(k^2)*kp*tau);
+    psi_y_dot_2 = -(k^2 + 1)*sin(f0);
+    psi_y_dot_3 = -e - (k^2 + 1)*cos(f0);
+    psi_y_dot_4 = -kp;
 
-    % row 3
-    Phi(3,5) = sin(f0);
-    Phi(3,6) = cos(f0);
+    psi_z_dot_5 = e + cos(f0);
+    psi_z_dot_6 = -sin(f0);
 
-    % row 4
-    Phi(4,1) = 1.5*(kp/k) - 1.5*e*dk_sin*tau;
-    Phi(4,2) = dk_sin;
-    Phi(4,3) = dk_cos;
-
-    % row 5
-    Phi(5,1) = -1.5*(1 + 2*k*kp*tau);
-    Phi(5,2) = -2 * k * sin(f0);
-    Phi(5,3) = e - 2*k * cos(f0);
-
-    % row 6
-    Phi(6,5) = cos(f0);
-    Phi(6,6) = -sin(f0);
-
-    %-- invert to get your six K constants --
-    Ks = Phi \ X0;
+    A = [a*(eta^2)*eye(3), zeros(3); zeros(3), (a*n/eta)*eye(3)];
+    B = [psi_x_1 psi_x_2 psi_x_3 0 0 0; ...
+        psi_y_1 psi_y_2 psi_y_3 psi_y_4 0 0; ...
+        0 0 0 0 psi_z_5 psi_z_6; ...
+        psi_x_dot_1 psi_x_dot_2 psi_x_dot_3 0 0 0; ...
+        psi_y_dot_1 psi_y_dot_2 psi_y_dot_3 psi_y_dot_4 0 0; ...
+        0 0 0 0 psi_z_dot_5 psi_z_dot_6];
+    total = A * B;
+    Ks = total\rv_rel_RTN;
 end

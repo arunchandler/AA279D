@@ -36,12 +36,13 @@ function Phi = buildYAphi(a, e, f, tau)
     psi_zd6 = -sin(f);
 
     % assemble B
-    B = [psi_x1 psi_x2 psi_x3 0 0 0; ...
-        psi_y1 psi_y2 psi_y3 psi_y4 0 0; ...
-        0 0 0 0 psi_z5 psi_z6; ... 
-        psi_xd1 psi_xd2 psi_xd3 0 0 0; ...
-        psi_yd1 psi_yd2 psi_yd3 psi_yd4 0 0; ...
-        0 0 0 0 psi_zd5 psi_zd6];
+    B = zeros(6,6);
+    B(1,1:3) = [psi_x1, psi_x2, psi_x3];
+    B(2,1:4) = [psi_y1, psi_y2, psi_y3, psi_y4];
+    B(3,5:6) = [psi_z5, psi_z6];
+    B(4,1:3) = [psi_xd1, psi_xd2, psi_xd3];
+    B(5,1:4) = [psi_yd1, psi_yd2, psi_yd3, psi_yd4];
+    B(6,5:6) = [psi_zd5, psi_zd6];
 
     % scale by A = diag([a·η², a·η², a·η², a·n/η, a·n/η, a·n/η])
     A = [a*eta^2*eye(3),           zeros(3);
