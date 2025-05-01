@@ -569,8 +569,9 @@ end
 % dlambda' = -21/2(gamma*sin(2i)*dix+1/7*da)
 % for no drift in dlambda, we want dix = 0
 % We change dix to 0 degrees
-% To subtract 30 degrees from inclination, we use:
+% To subtract 30 from inclination, we use:
 % dv = sqrt( 2v^2 - 4v*cos(i) )
+% i = 30/a
 % direction will be anti normal at u=0 or normal at u=180
 
 a_TDX_f =  6886536.686;
@@ -584,8 +585,9 @@ u_TDX_f = omega_TDX_f + M_TDX_f %should be 0
 TDX_oe_f = [a_TDX_f, e_TDX_f, i_TDX_f, RAAN_TDX_f, omega_TDX_f, M_TDX_f];
 TDX_rv_f = oe2rv(TDX_oe_f, mu);
 
-v = norm(TDX_rv_f(4:6));
-dv = sqrt(2*v^2 - 4*v*cosd(30))
+v = norm(TDX_rv_f(4:6))
+i = 30/a_TSX_init_2
+dv = 2*v*sin(i/2)
 
 
 % Part g) Propagation with new qns roe
@@ -677,7 +679,6 @@ for idx = 1:num_points
 
 end
 
-%–– Pull out each relative QNS component as before
 ada_osc_g         = rel_osc_g(:,1);
 adlambda_osc_g    = rel_osc_g(:,2);
 adex_osc_g        = rel_osc_g(:,3);
