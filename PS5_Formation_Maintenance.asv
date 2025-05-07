@@ -3,15 +3,15 @@ addpath('mean_osc');
 format long g;
 
 global tol Re J2 mu s_d
-tol = 10e-10;
-Re = 6378137; % m
-J2 = 1.082626e-3;
-mu = 3.986004418e14; % (m^3/s^2)
-s_d = 86400; % seconds per day
+% Tolerances and constants
+ tol = 1e-9;           % numerical tolerance
+ Re = 6378137;         % Earth radius [m]
+ J2 = 1.082626e-3;     % J2 coefficient
+ mu = 3.986004418e14;  % gravitational parameter [m^3/s^2]
+ s_d = 86400;          % seconds per day
 
-%% Problem 1
-
-scenario = input( ...
+%% Scenario Selection
+scenario = input(...
     ['Select rel_qns_init scenario:\n' ...
      '  1: DEM formation (e_term=122/√2)\n' ...
      '  2: Example “circular” formation\n' ...
@@ -20,306 +20,165 @@ scenario = input( ...
 
 switch scenario
     case 1
-        % DEM
         e_term = 122/sqrt(2);
         rel_qns_init = [0, 340, e_term, e_term, 0, 256];
         scenario_name = 'DEM';
-        
     case 2
-        % Pursuit
         e_term = 4982/sqrt(2);
-        rel_qns_init = [0, -76050, e_term, e_term, 80, 0 ];  
+        rel_qns_init = [0, -76050, e_term, e_term, 80, 0];
         scenario_name = 'Pursuit';
-        
     case 3
-        % Large cross-track
         e_term = 3600/sqrt(2);
-        rel_qns_init = [0, 0, e_term, e_term, 250, 0 ];  
+        rel_qns_init = [0, 0, e_term, e_term, 250, 0];
         scenario_name = 'Large cross-track';
-    
     case 4
-        % Short baseline
         e_term = 250/sqrt(2);
-        rel_qns_init = [0, -340, e_term, e_term, 250, 0 ];  
+        rel_qns_init = [0, -340, e_term, e_term, 250, 0];
         scenario_name = 'Short baseline';
-
     case 5
-        %Damico separation
         rel_qns_init = [0, 0, 0, 300, 0, -1000];
-
-        
+        scenario_name = 'Damico Paper Initialization';
     otherwise
         error('Invalid scenario');
 end
+fprintf('Running scenario "%s": rel_qns_init = [%g %g %g %g %g %g]\n\n', scenario_name, rel_qns_init);
 
-fprintf('Running scenario "%s": rel_qns_init = [%g %g %g %g %g %g]\n\n', ...
-        scenario_name, rel_qns_init);
-
-% initial chief elements
-a_TSX_init    = 6886536.686;  % m
-e_TSX_init    = 0.0001264;
-i_TSX_init    = deg2rad(97.4453);
-RAAN_TSX_init = deg2rad(351.0108);
-omega_TSX_init= deg2rad(101.2452);
-M_TSX_init    = deg2rad(11.6520);
+% Chief initial orbital elements
+a_TSX_init    = 6892944.65;    % semi-major axis [m]
+e_TSX_init    = 0.00013700;    % eccentricity
+i_TSX_init    = deg2rad(97.440124); % inclination [rad]
+RAAN_TSX_init = deg2rad(104.274891);
+omega_TSX_init= deg2rad(67.975723);
+M_TSX_init    = deg2rad(292.169756);
 nu_TSX_init   = mean2true(M_TSX_init, e_TSX_init, tol);
-u_TSX_init    = nu_TSX_init + omega_TSX_init;
+u_TSX_init   = nu_TSX_init;     % true anomaly
+TSX_init_oe   = [a_TSX_init, e_TSX_init, i_TSX_init, RAAN_TSX_init, omega_TSX_init, M_TSX_init];
 
-TSX_init_oe = [a_TSX_init, e_TSX_init, i_TSX_init, ...
-               RAAN_TSX_init, omega_TSX_init, M_TSX_init];
-
-% map to TDX via your chosen rel_qns_init
+% Deputy initial orbital elements
 TDX_init_oe = qns2oe(TSX_init_oe, rel_qns_init);
 
-% timing parameters, propagation, etc. (unchanged)
-tstart     = 0.0;
-n          = sqrt(mu/a_TSX_init^3);
-T          = 2*pi/n;
-n_orbit    = 15;
-tend       = n_orbit*T;
-num_points = 1000;
-dt         = (tend - tstart)/(num_points-1);
-t_grid     = linspace(tstart, tend, num_points).';
-t_orbit    = t_grid / T;
+%% Time grid and chief propagation
+tstart  = 0;
+n       = sqrt(mu/a_TSX_init^3);
+T       = 2*pi/n;
+tend    = 30 * s_d;         % 30 days in seconds
+num_points = 10000;
+dt      = (tend - tstart)/(num_points-1);
+t_grid  = linspace(tstart, tend, num_points).';
+t_orbit = t_grid / T;
 
-% propagate with your ode4 + J2
-[t_out, TSX_oe] = ode4(@compute_rates_GVE_J2, [tstart, tend]', TSX_init_oe', dt);
-[~,     TDX_oe] = ode4(@compute_rates_GVE_J2, [tstart, tend]', TDX_init_oe,  dt);
-
+% Precompute chief trajectory under J2
+[~, TSX_oe] = ode4(@compute_rates_GVE_J2, [tstart, tend], TSX_init_oe', dt);
 TSX_oe(:,6) = wrapTo2Pi(TSX_oe(:,6));
-TDX_oe(:,6) = wrapTo2Pi(TDX_oe(:,6));
 
-% compute relative OEs and RTN
-rel_oe = zeros(num_points, 6);
-rtn    = zeros(num_points, 6);
+%% Preallocate deputy (controlled) and performance logs
+TDX_oe_ctrl   = zeros(num_points,6);
+TDX_oe_ctrl(1,:) = TDX_init_oe;
+rel_oe_ctrl   = zeros(num_points,6);
+dv_series     = zeros(num_points,1);  % Δv at each step
+maneuver_flag = zeros(num_points,1);  % 0=no burn, 1=1st burn, 2=2nd burn
+maneuver_schedule = [];             % to hold scheduled burns
 
-for idx = 1:num_points
-    
-    a1 = TSX_oe(idx,1); e1 = TSX_oe(idx,2); i1 = TSX_oe(idx,3);
-    RAAN1 = TSX_oe(idx,4); omega1 = TSX_oe(idx,5);
-    M1 = wrapTo2Pi(TSX_oe(idx,6)); u1 = M1 + omega1;
-    
-    a2 = TDX_oe(idx,1); e2 = TDX_oe(idx,2); i2 = TDX_oe(idx,3);
-    RAAN2 = TDX_oe(idx,4); omega2 = TDX_oe(idx,5);
-    M2 = wrapTo2Pi(TDX_oe(idx,6)); u2 = M2 + omega2;
-    
-    rel_oe(idx,:) = a1 * compute_roes([a1, e1, i1, RAAN1, omega1, M1], ...
-                                      [a2, e2, i2, RAAN2, omega2, M2])';
-    
-    r1 = oe2rv(TSX_oe(idx,:), mu);
-    r2 = oe2rv(TDX_oe(idx,:), mu);
-    rtn(idx,:) = eci2rtn(r1, r2)';    
-end
-
-%plotting orbital elements
-figure;
-subplot(3,2,1)
-plot(t_orbit, TSX_oe(:,1)); grid on;
-xlabel('Orbits'); ylabel('a [m]')
-title('Semi–major axis')
-
-subplot(3,2,2)
-plot(t_orbit, TSX_oe(:,2)); grid on;
-xlabel('Orbits'); ylabel('e')
-title('Eccentricity')
-
-subplot(3,2,3)
-plot(t_orbit, rad2deg(TSX_oe(:,3))); grid on;
-xlabel('Orbits'); ylabel('i [deg]')
-title('Inclination')
-
-subplot(3,2,4)
-plot(t_orbit, rad2deg(TSX_oe(:,4))); grid on;
-xlabel('Orbits'); ylabel('\Omega [deg]')
-title('RAAN')
-
-subplot(3,2,5)
-plot(t_orbit, rad2deg(TSX_oe(:,5))); grid on;
-xlabel('Orbits'); ylabel('\omega [deg]')
-title('Argument of perigee')
-
-subplot(3,2,6)
-plot(t_orbit, rad2deg(TSX_oe(:,6))); grid on;
-xlabel('Orbits'); ylabel('M [deg]')
-title('Mean anomaly')
-
-figure;
-subplot(3,2,1)
-plot(t_orbit, TDX_oe(:,1)); grid on;
-xlabel('Orbits'); ylabel('a [m]')
-title('Semi–major axis')
-
-subplot(3,2,2)
-plot(t_orbit, TDX_oe(:,2)); grid on;
-xlabel('Orbits'); ylabel('e')
-title('Eccentricity')
-
-subplot(3,2,3)
-plot(t_orbit, rad2deg(TDX_oe(:,3))); grid on;
-xlabel('Orbits'); ylabel('i [deg]')
-title('Inclination')
-
-subplot(3,2,4)
-plot(t_orbit, rad2deg(TDX_oe(:,4))); grid on;
-xlabel('Orbits'); ylabel('\Omega [deg]')
-title('RAAN')
-
-subplot(3,2,5)
-plot(t_orbit, rad2deg(TDX_oe(:,5))); grid on;
-xlabel('Orbits'); ylabel('\omega [deg]')
-title('Argument of perigee')
-
-subplot(3,2,6)
-plot(t_orbit, rad2deg(TDX_oe(:,6))); grid on;
-xlabel('Orbits'); ylabel('M [deg]')
-title('Mean anomaly')
-
-% unpack
-rR = rtn(:,1);
-rT = rtn(:,2);
-rN = rtn(:,3);
-
-% TR plane: T vs R
-% NR plane: N vs R
-% TN plane: T vs N
-figure;
-subplot(1,3,1)
-plot(rT, rR, '-'); grid on; axis equal
-xlabel('r_T [m]'); ylabel('r_R [m]');
-title('RTN: TR plane')
-
-subplot(1,3,2)
-plot(rN, rR, '-'); grid on; axis equal
-xlabel('r_N [m]'); ylabel('r_R [m]');
-title('RTN: NR plane')
-
-subplot(1,3,3)
-plot(rT, rN, '-'); grid on; axis equal
-xlabel('r_T [m]'); ylabel('r_N [m]');
-title('RTN: TN plane')
-
-%Now using J2 STM matrix
-roe_stm = zeros(num_points, 6);
-roe_stm(1,:) = rel_qns_init;
-
-for idx = 2:num_points
- 
-    oe = TSX_oe(idx,:);
-    phi = stm_qns_j2(dt, oe);
-    roe_stm(idx,:) = phi * roe_stm(idx-1,:)';
-
-end
-
-% Unpack propagated relative OE
-delta_a_prop      = rel_oe(:,1);
-delta_lambda_prop = rel_oe(:,2);
-delta_ex_prop     = rel_oe(:,3);
-delta_ey_prop     = rel_oe(:,4);
-delta_ix_prop     = rel_oe(:,5);
-delta_iy_prop     = rel_oe(:,6);
-
-% Unpack STM relative OE
-delta_a_stm      = roe_stm(:,1);
-delta_lambda_stm = roe_stm(:,2);
-delta_ex_stm     = roe_stm(:,3);
-delta_ey_stm     = roe_stm(:,4);
-delta_ix_stm     = roe_stm(:,5);
-delta_iy_stm     = roe_stm(:,6);
-
-% 1) Δa vs Δλ
-figure;
-plot(delta_a_prop,      delta_lambda_prop, '-' , 'LineWidth',1.5); hold on;
-plot(delta_a_stm,       delta_lambda_stm, '--', 'LineWidth',1.5);
-grid on; axis equal;
-xlabel('a\delta a [m]'); ylabel('a\delta \lambda [m]');
-title('Relative OE: a\delta a vs a\delta \lambda');
-legend('Propagated','STM','Location','best');
-
-% 2) Δe_x vs Δe_y
-figure;
-plot(delta_ex_prop,     delta_ey_prop, '-' , 'LineWidth',1.5); hold on;
-plot(delta_ex_stm,      delta_ey_stm, '--', 'LineWidth',1.5);
-grid on; axis equal;
-xlabel('a\delta e_x [m]'); ylabel('a\delta e_y [m]');
-title('Relative OE: a\delta e_x vs a\delta e_y');
-legend('Propagated','STM','Location','best');
-
-% 3) Δi_x vs Δi_y
-figure;
-plot(delta_ix_prop,     delta_iy_prop, '-' , 'LineWidth',1.5); hold on;
-plot(delta_ix_stm,      delta_iy_stm, '--', 'LineWidth',1.5);
-grid on; axis equal;
-xlabel('a\delta i_x [m]'); ylabel('a\delta i_y [m]');
-title('Relative OE: a\delta i_x vs a\delta i_y');
-legend('Propagated','STM','Location','best');
-
-
-% === CONTROL SECTION: Initialize ===
+% Control parameters
 a = a_TSX_init;
-v = sqrt(mu / a);
-maneuver_log = [];
+roe_target   = [0; 0; 0; 300; 0; -1000];  % desired ROE [m]
+angle_thresh_deg = 7;
 
-% Target (nominal) ROE [delta_a, delta_lambda, delta_eX, delta_eY, delta_iX, delta_iY]
-roe_target = [0; 0; 0; 300/a; 0; -1000/a];  % Example: 300m radial, 1km cross-track
+TM_days      = 2;                     % check interval [days]
+TM_sec       = TM_days * s_d;         % seconds
+cycle_step   = round(TM_sec/dt);      % samples per cycle
+check_idxs   = cycle_step : cycle_step : num_points;
 
-% Maneuver detection threshold (angle between e/i vectors)
-trigger_angle_threshold = deg2rad(7);  % radians
 
-% === Loop through to detect maneuver triggers and compute Δv ===
-for idx = 1:num_points
-    roe_now = rel_oe(idx,:)';
-    delta_e_vec = roe_now(3:4);
-    delta_i_vec = roe_now(5:6);
+%% Simulation loop with integrated burns
+for idx = 2:num_points
+    % Propagate deputy one timestep
+    tspan = [t_grid(idx-1), t_grid(idx)];
+    [~, oe_temp] = ode4(@compute_rates_GVE_J2, tspan, TDX_oe_ctrl(idx-1,:)', dt);
+    oe_new = oe_temp(end,:);
+    oe_new(6) = wrapTo2Pi(oe_new(6));
+    TDX_oe_ctrl(idx,:) = oe_new;
     
-    % Angle between e/i vectors
-    cos_angle = dot(delta_e_vec, delta_i_vec) / (norm(delta_e_vec) * norm(delta_i_vec));
-    angle = acos(max(min(cos_angle,1),-1));  % clamp for numerical stability
+    % Compute relative ROEs
+    rel = a * compute_roes(TSX_oe(idx,:), oe_new)';
+    rel_oe_ctrl(idx,:) = rel;
     
-    % Check if trigger condition met
-    if angle > trigger_angle_threshold
-        % Compute maneuver: Δv_T1, Δv_T2
-        delta_a = roe_now(1) - roe_target(1);
-        delta_e_err = delta_e_vec - roe_target(3:4);
-        delta_e_mag = norm(delta_e_err);
-        
-        dvt1 = (v/4)*(delta_e_mag + delta_a/a);
-        dvt2 = -(v/4)*(delta_e_mag - delta_a/a);
-
-        % Maneuver locations in mean argument of latitude
-        u1 = atan2(delta_e_err(2), delta_e_err(1));  % phase of delta_e
-        u2 = mod(u1 + pi, 2*pi);  % opposite side of orbit
-
-        % Store in maneuver log for later insertion
-        maneuver_log = [maneuver_log; struct( ...
-            'idx', idx, ...
-            't', t_grid(idx), ...
-            'dvt1', dvt1, ...
-            'dvt2', dvt2, ...
-            'u1', u1, ...
-            'u2', u2, ...
-            'delta_e_err', delta_e_err, ...
-            'trigger_angle_deg', rad2deg(angle))];
-        
-        fprintf('[%5.2f orbits] Maneuver triggered! Δv_T1 = %.4f m/s, Δv_T2 = %.4f m/s, angle = %.2f°\n', ...
-                t_orbit(idx), dvt1, dvt2, rad2deg(angle));
-        
-        % Optionally, break after first detection (remove if you want ongoing control)
-        %break;
+    % only at your 2‑day checks, compute & schedule two‑pulse
+      if ismember(idx, check_idxs)
+        % 1) compute current e/i error at idx
+        rel_now     = rel_oe_ctrl(idx,:)';  
+        delta_e_err = (rel_now(3:4) - roe_target(3:4))/a;
+        delta_a_err = (rel_now(1)    - roe_target(1))   /a;
+    
+        % 2) Gauss formula for two tangential impulses
+        v_chief = sqrt(mu/a);
+        dvt1    =  (v_chief/4)*( norm(delta_e_err) + delta_a_err );
+        dvt2    = -(v_chief/4)*( norm(delta_e_err) - delta_a_err );
+    
+        % 3) pick their phasing in argument of latitude
+        u1 = atan2(delta_e_err(2), delta_e_err(1));
+        u2 = mod(u1 + pi, 2*pi);
+    
+        % 4) convert u1,u2 to sample indices idx1, idx2
+        M_c   = wrapTo2Pi(TSX_oe(idx,6));
+        nu_c  = mean2true(M_c, TSX_oe(idx,2), tol);
+        u_c   = wrapTo2Pi(nu_c + TSX_oe(idx,5));
+        du1   = wrapTo2Pi(u1 - u_c);
+        t1    = t_grid(idx) + du1 / n;
+        [~, idx1] = min(abs(t_grid - t1));
+        % now at idx1 compute u_c1, find idx2 similarly:
+        M_c1   = wrapTo2Pi(TSX_oe(idx1,6));
+        nu_c1  = mean2true(M_c1, TSX_oe(idx1,2), tol);
+        u_c1   = wrapTo2Pi(nu_c1 + TSX_oe(idx1,5));
+        du2    = wrapTo2Pi(u2 - u_c1);
+        t2     = t_grid(idx1) + du2 / n;
+        [~, idx2] = min(abs(t_grid - t2));
+    
+        maneuver_schedule = [ maneuver_schedule; struct( ...
+            'idx1', idx1, 'idx2', idx2, ...
+            'dvt1', dvt1,  'dvt2', dvt2 ) ];
+        fprintf('Cycle @ idx=%d: scheduled burns @ %d & %d\n', idx, idx1, idx2);
+      end
+    
+    for m = 1:numel(maneuver_schedule)
+        if idx==maneuver_schedule(m).idx1 || idx==maneuver_schedule(m).idx2
+          % same RTN Δv‑application you already wrote:
+          dvi = ( idx==maneuver_schedule(m).idx1 ) ...
+                 ? maneuver_schedule(m).dvt1 ...
+                 : maneuver_schedule(m).dvt2;
+          oe_t = TDX_oe_ctrl(idx,:);
+          nu_d = mean2true(oe_t(6), oe_t(2), tol);
+          rv   = oe2rv([oe_t(1:5),nu_d],mu);
+          r    = rv(1:3); v  = rv(4:6);
+          N_hat = cross(r,v)/norm(cross(r,v));
+          R_hat =  r/norm(r);
+          T_hat = cross(N_hat,R_hat);
+          v_new = v + dvi*T_hat;
+          oe_full = rv2oe([r;v_new],mu);
+          M_new   = true2mean(oe_full(6), oe_full(2));
+          TDX_oe_ctrl(idx,:) = [oe_full(1:5), M_new];
+          dv_series(idx)     = abs(dvi);
+          maneuver_flag(idx) = (idx==maneuver_schedule(m).idx1) + 1;
+          fprintf('  --> Applied burn %d at idx=%d, Δv=%.3f m/s\n',...
+                  maneuver_flag(idx), idx, dv_series(idx));
+        end
     end
 end
-
-if ~isempty(maneuver_log)
-    figure;
-    hold on;
-    plot(delta_ex_prop, delta_ey_prop, 'b');
-    plot(roe_target(3), roe_target(4), 'go', 'MarkerSize', 8, 'LineWidth', 2);
-    for k = 1:length(maneuver_log)
-        plot(maneuver_log(k).delta_e_err(1) + roe_target(3), ...
-             maneuver_log(k).delta_e_err(2) + roe_target(4), ...
-             'rx', 'MarkerSize', 10, 'LineWidth', 2);
-    end
-    grid on; axis equal;
-    xlabel('a δe_x [m]'); ylabel('a δe_y [m]');
-    title('Eccentricity Vector Evolution and Maneuver Triggers');
 end
 
+%% Performance Visualization
+% 1) Control Tracking Error
+err = vecnorm(rel_oe_ctrl - roe_target', 2, 2);
+figure;
+plot(t_orbit, err); grid on;
+xlabel('Orbits'); ylabel('||rel error|| [m]'); title('Control Tracking Error');
+
+% 2) Maneuver Scheduling
+figure;
+stem(t_orbit(maneuver_flag>0), maneuver_flag(maneuver_flag>0), 'filled'); grid on;
+xlabel('Orbits'); ylabel('Stage'); title('Maneuver Scheduling');
+
+% 3) Δv Over Time
+figure;
+stairs(t_orbit, dv_series); grid on;
+xlabel('Orbits'); ylabel('Δv [m/s]'); title('Delta-v Time History');
