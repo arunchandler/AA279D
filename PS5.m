@@ -9,39 +9,30 @@ J2 = 1.082626e-3;
 mu = 3.986004418e14; % (m^3/s^2)
 s_d = 86400; % seconds per day
 
-%% Problem 1
+%% Problem 1 - relative dynamics without control
 
 scenario = input( ...
     ['Select rel_qns_init scenario:\n' ...
-     '  1: DEM formation (e_term=122/√2)\n' ...
-     '  2: Example “circular” formation\n' ...
-     '  3: Custom (enter manually)\n' ...
+     '  1: M-D2\n' ...
+     '  2: M-D3\n' ...
+     '  3: M-D4\n' ...
      'Your choice: '] );
 
 switch scenario
     case 1
-        % DEM
-        e_term = 122/sqrt(2);
-        rel_qns_init = [0, 340, e_term, e_term, 0, 256];
-        scenario_name = 'DEM';
+        % M-D2
+        rel_qns_init = [0, 0, 0, 300, 0, 400];
+        scenario_name = 'M-C';
         
     case 2
-        % Pursuit
-        e_term = 4982/sqrt(2);
-        rel_qns_init = [0, -76050, e_term, e_term, 80, 0 ];  
-        scenario_name = 'Pursuit';
+        % M-D3
+        rel_qns_init = [0, 0, 0, 300, 0, 500];  
+        scenario_name = 'M-D1';
         
     case 3
-        % Large cross-track
-        e_term = 3600/sqrt(2);
-        rel_qns_init = [0, 0, e_term, e_term, 250, 0 ];  
-        scenario_name = 'Large cross-track';
-    
-    case 4
-        % Short baseline
-        e_term = 250/sqrt(2);
-        rel_qns_init = [0, -340, e_term, e_term, 250, 0 ];  
-        scenario_name = 'Short baseline';
+        % M-D4
+        rel_qns_init = [0, 0, 0, 500, 0, 300];  
+        scenario_name = 'M-E';
         
     otherwise
         error('Invalid scenario');
@@ -248,3 +239,187 @@ xlabel('a\delta i_x [m]'); ylabel('a\delta i_y [m]');
 title('Relative OE: a\delta i_x vs a\delta i_y');
 legend('Propagated','STM','Location','best');
 
+%% Problem 2 - reconfiguration
+
+scenario = input( ...
+    ['Select reconfiguration scenario:\n' ...
+     '  1: M-D2 to M-D3\n' ...
+     '  2: M-D3 to M-D4\n' ...
+     'Your choice: '] );
+
+switch scenario
+    case 1
+        % M-C to M-D1
+        rel_qns_pre = [0, 0, 0, 300, 0, 400];
+        rel_qns_post  = [0, 0, 0, 300, 0, 500];
+        scenario_name = 'M-D2 to M-D3';
+        
+    case 2
+        % M-D1 to M-E
+        rel_qns_pre = [0, 0, 0, 300, 0, 500];
+        rel_qns_post  = [0, 0, 0, 500, 0, 300];
+        scenario_name = 'M-D3 to M-D4';
+        
+    otherwise
+        error('Invalid scenario');
+end
+
+fprintf('Running scenario "%s": rel_qns_init = [%g %g %g %g %g %g]\n', ...
+        'rel_qns_fin = [%g %g %g %g %g %g]\n', ...
+        scenario_name, [rel_qns_pre, rel_qns_post]);
+
+TDX_init_oe_pre = qns2oe(TSX_init_oe, rel_qns_pre);
+
+% propagate with your ode4 + J2
+[~, TDX_oe_pre] = ode4(@compute_rates_GVE_J2, [tstart, tend/2]', TDX_init_oe_pre,  dt);
+TDX_oe_pre(:,6) = wrapTo2Pi(TDX_oe_pre(:,6));
+
+% compute relative OEs and RTN
+rel_oe_pre = zeros(num_points/2, 6);
+rtn_pre    = zeros(num_points/2, 6);
+
+for idx = 1:num_points/2
+    
+    a1 = TSX_oe(idx,1); e1 = TSX_oe(idx,2); i1 = TSX_oe(idx,3);
+    RAAN1 = TSX_oe(idx,4); omega1 = TSX_oe(idx,5);
+    M1 = wrapTo2Pi(TSX_oe(idx,6)); u1 = M1 + omega1;
+    
+    a2 = TDX_oe_pre(idx,1); e2 = TDX_oe_pre(idx,2); i2 = TDX_oe_pre(idx,3);
+    RAAN2 = TDX_oe_pre(idx,4); omega2 = TDX_oe_pre(idx,5);
+    M2 = wrapTo2Pi(TDX_oe_pre(idx,6)); u2 = M2 + omega2;
+    
+    rel_oe_pre(idx,:) = a1 * compute_roes([a1, e1, i1, RAAN1, omega1, M1], ...
+                                      [a2, e2, i2, RAAN2, omega2, M2])';
+    
+    r1 = oe2rv(TSX_oe(idx,:), mu);
+    r2 = oe2rv(TDX_oe_pre(idx,:), mu);
+    rtn_pre(idx,:) = eci2rtn(r1, r2)';
+
+end
+
+% delta V calculation
+
+Ddiy     = rel_qns_post(6) - rel_qns_pre(6);
+Ddey     = rel_qns_post(4) - rel_qns_pre(4);
+Ddlambda = rel_qns_post(2) - rel_qns_pre(2);
+
+a_m = TSX_oe(num_points/2,1);
+
+%out of plane portion
+uM_op = pi/2;
+dvn = Ddiy * n / sin(uM_op)
+
+%in plane portion
+dvt = 0.0; %because we dont want sma change, we can set this to 0 and choose dvr to satisfy change in dey
+uM_ip1 = 0.0;
+uM_ip2 = pi - uM_ip1;
+dvr1 = Ddey * n * a_m / (-2 * cos(uM_ip1))
+dvr2 = -dvr1
+
+% --- compute total delta‐V ---
+DV_op  = abs(dvn);        % out‐of‐plane impulse magnitude
+DV_ip1 = abs(dvr1);       % in‐plane impulse at u = 0
+DV_ip2 = abs(dvr2);       % in‐plane impulse at u = pi
+DV_tot = DV_op + DV_ip1 + DV_ip2;
+
+% --- print Delta‑V budget ---
+fprintf('\n=== ΔV Budget ===\n');
+fprintf('Out‑of‑plane (dvn)     = %.6f m/s\n', dvn);
+fprintf('In‑plane stage 1 (dvr1) = %.6f m/s\n', dvr1);
+fprintf('In‑plane stage 2 (dvr2) = %.6f m/s\n', dvr2);
+fprintf('Total ΔV               = %.6f m/s\n\n', DV_tot);
+
+% --- print achieved QNS changes ---
+fprintf('=== QNS Element Changes ===\n');
+fprintf('Δi_y      = %.6e rad\n', Ddiy);
+fprintf('Δe_y      = %.6e    \n', Ddey);
+fprintf('Δλ (dlambda) = %.6e rad\n', Ddlambda);
+
+%Post manuever propagation
+TDX_init_oe_post = qns2oe(TSX_oe(num_points/2+1,:), rel_qns_post);
+[~, TDX_oe_post] = ode4(@compute_rates_GVE_J2, [tstart, tend/2]', TDX_init_oe_post, dt);
+TDX_oe_post(:,6) = wrapTo2Pi(TDX_oe_post(:,6));
+
+rel_oe_post = zeros(num_points/2, 6);
+rtn_post    = zeros(num_points/2, 6);
+
+for idx = 1:num_points/2
+    
+    a1 = TSX_oe(num_points/2+idx,1); e1 = TSX_oe(num_points/2+idx,2); i1 = TSX_oe(num_points/2+idx,3);
+    RAAN1 = TSX_oe(num_points/2+idx,4); omega1 = TSX_oe(num_points/2+idx,5);
+    M1 = wrapTo2Pi(TSX_oe(num_points/2+idx,6)); u1 = M1 + omega1;
+    
+    a2 = TDX_oe_post(idx,1); e2 = TDX_oe_post(idx,2); i2 = TDX_oe_post(idx,3);
+    RAAN2 = TDX_oe_post(idx,4); omega2 = TDX_oe_post(idx,5);
+    M2 = wrapTo2Pi(TDX_oe_post(idx,6)); u2 = M2 + omega2;
+    
+    rel_oe_post(idx,:) = a1 * compute_roes([a1, e1, i1, RAAN1, omega1, M1], ...
+                                      [a2, e2, i2, RAAN2, omega2, M2])';
+    
+    r1 = oe2rv(TSX_oe(num_points/2+idx,:), mu);
+    r2 = oe2rv(TDX_oe_post(idx,:), mu);
+    rtn_post(idx,:) = eci2rtn(r1, r2)';
+
+end
+
+% RTN frame: pre- and post-maneuver
+rR_pre  = rtn_pre(:,1); 
+rT_pre  = rtn_pre(:,2); 
+rN_pre  = rtn_pre(:,3);
+rR_post = rtn_post(:,1);
+rT_post = rtn_post(:,2);
+rN_post = rtn_post(:,3);
+
+figure;
+subplot(1,3,1)
+plot(rT_pre,  rR_pre,  'b-', ...
+     rT_post, rR_post, 'r--'); grid on; axis equal
+xlabel('r_T [m]'); ylabel('r_R [m]');
+title('RT plane'); legend('Pre','Post')
+
+subplot(1,3,2)
+plot(rN_pre,  rR_pre,  'b-', ...
+     rN_post, rR_post, 'r--'); grid on; axis equal
+xlabel('r_N [m]'); ylabel('r_R [m]');
+title('NR plane'); legend('Pre','Post')
+
+subplot(1,3,3)
+plot(rT_pre,  rN_pre,  'b-', ...
+     rT_post, rN_post, 'r--'); grid on; axis equal
+xlabel('r_T [m]'); ylabel('r_N [m]');
+title('TN plane'); legend('Pre','Post')
+
+
+% Relative orbital elements: pre- and post-maneuver
+da_pre      = rel_oe_pre(:,1);
+dex_pre     = rel_oe_pre(:,2);
+dey_pre     = rel_oe_pre(:,3);
+dix_pre     = rel_oe_pre(:,4);
+diy_pre     = rel_oe_pre(:,5);
+dlambda_pre = rel_oe_pre(:,6);
+
+da_post      = rel_oe_post(:,1);
+dex_post     = rel_oe_post(:,2);
+dey_post     = rel_oe_post(:,3);
+dix_post     = rel_oe_post(:,4);
+diy_post     = rel_oe_post(:,5);
+dlambda_post = rel_oe_post(:,6);
+
+figure;
+subplot(1,3,1)
+plot(da_pre,      dlambda_pre,      'b-', ...
+     da_post,     dlambda_post,     'r--'); grid on; axis equal
+xlabel('a\delta a [m]'); ylabel('a\delta \lambda [m]');
+title('a\delta a vs a\delta \lambda'); legend('Pre','Post')
+
+subplot(1,3,2)
+plot(dex_pre,     dey_pre,          'b-', ...
+     dex_post,    dey_post,         'r--'); grid on; axis equal
+xlabel('a\delta e_x [m]'); ylabel('a\delta e_y [m]');
+title('a\delta e_x vs a\delta e_y'); legend('Pre','Post')
+
+subplot(1,3,3)
+plot(dix_pre,     diy_pre,          'b-', ...
+     dix_post,    diy_post,         'r--'); grid on; axis equal
+xlabel('a\delta i_x [m]'); ylabel('a\delta i_y [m]');
+title('a\delta i_x vs a\delta i_y'); legend('Pre','Post')
