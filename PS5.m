@@ -67,6 +67,7 @@ num_points = 1000;
 dt         = (tend - tstart)/(num_points-1);
 t_grid     = linspace(tstart, tend, num_points).';
 t_orbit    = t_grid / T;
+orbit_num = floor(t_orbit) + 1;
 
 % propagate with your ode4 + J2
 [t_out, TSX_oe] = ode4(@compute_rates_GVE_J2, [tstart, tend]', TSX_init_oe', dt);
@@ -249,13 +250,13 @@ scenario = input( ...
 
 switch scenario
     case 1
-        % M-C to M-D1
+        % M-D2 to M-D3
         rel_qns_pre = [0, 0, 0, 300, 0, 400];
         rel_qns_post  = [0, 0, 0, 300, 0, 500];
         scenario_name = 'M-D2 to M-D3';
         
     case 2
-        % M-D1 to M-E
+        % M-D3 to M-D4
         rel_qns_pre = [0, 0, 0, 300, 0, 500];
         rel_qns_post  = [0, 0, 0, 500, 0, 300];
         scenario_name = 'M-D3 to M-D4';
@@ -264,38 +265,31 @@ switch scenario
         error('Invalid scenario');
 end
 
-fprintf('Running scenario "%s": rel_qns_init = [%g %g %g %g %g %g]\n', ...
-        'rel_qns_fin = [%g %g %g %g %g %g]\n', ...
+fprintf('Running scenario "%s": rel_qns_init = [%g %g %g %g %g %g]\n rel_qns_fin = [%g %g %g %g %g %g]\n', ...
         scenario_name, [rel_qns_pre, rel_qns_post]);
 
-TDX_init_oe_pre = qns2oe(TSX_init_oe, rel_qns_pre);
+TDX_init_oe_2 = qns2oe(TSX_init_oe, rel_qns_pre);
+TSX_init_rv = oe2rv(TSX_init_oe, mu);
+TDX_init_rv = oe2rv(TDX_init_oe_2, mu);
+TDX_init_rtn = eci2rtn(TSX_init_rv, TDX_init_rv);
+rel_state_init = [TDX_init_rtn; TSX_init_rv];
 
-% propagate with your ode4 + J2
-[~, TDX_oe_pre] = ode4(@compute_rates_GVE_J2, [tstart, tend/2]', TDX_init_oe_pre,  dt);
-TDX_oe_pre(:,6) = wrapTo2Pi(TDX_oe_pre(:,6));
+state_out = zeros(num_points, 12);
+state_out(1,:) = rel_state_init';
 
-% compute relative OEs and RTN
-rel_oe_pre = zeros(num_points/2, 6);
-rtn_pre    = zeros(num_points/2, 6);
+TDX_oe_2 = zeros(num_points, 6);
+TDX_oe_2(1,:) = TDX_init_oe_2;
 
-for idx = 1:num_points/2
-    
-    a1 = TSX_oe(idx,1); e1 = TSX_oe(idx,2); i1 = TSX_oe(idx,3);
-    RAAN1 = TSX_oe(idx,4); omega1 = TSX_oe(idx,5);
-    M1 = wrapTo2Pi(TSX_oe(idx,6)); u1 = M1 + omega1;
-    
-    a2 = TDX_oe_pre(idx,1); e2 = TDX_oe_pre(idx,2); i2 = TDX_oe_pre(idx,3);
-    RAAN2 = TDX_oe_pre(idx,4); omega2 = TDX_oe_pre(idx,5);
-    M2 = wrapTo2Pi(TDX_oe_pre(idx,6)); u2 = M2 + omega2;
-    
-    rel_oe_pre(idx,:) = a1 * compute_roes([a1, e1, i1, RAAN1, omega1, M1], ...
-                                      [a2, e2, i2, RAAN2, omega2, M2])';
-    
-    r1 = oe2rv(TSX_oe(idx,:), mu);
-    r2 = oe2rv(TDX_oe_pre(idx,:), mu);
-    rtn_pre(idx,:) = eci2rtn(r1, r2)';
+rel_oe_2 = zeros(num_points, 6);
+rel_oe_2(1,:) = compute_roes(TSX_init_oe, TDX_init_oe_2);
 
-end
+state_cur = rel_state_init;
+
+% --- precompute target indices ---
+% chief argument of latitude array:
+u_TSX = wrapTo2Pi(TSX_oe(:,6)) + TSX_oe(:,5);
+target_orbit = 7;
+mask = (orbit_num == target_orbit);
 
 % delta V calculation
 
@@ -307,20 +301,83 @@ a_m = TSX_oe(num_points/2,1);
 
 %out of plane portion
 uM_op = pi/2;
-dvn = Ddiy * n / sin(uM_op)
+dvn = Ddiy * n / sin(uM_op);
 
 %in plane portion
 dvt = 0.0; %because we dont want sma change, we can set this to 0 and choose dvr to satisfy change in dey
 uM_ip1 = 0.0;
 uM_ip2 = pi - uM_ip1;
-dvr1 = Ddey * n * a_m / (-2 * cos(uM_ip1))
-dvr2 = -dvr1
+dvr1 = Ddey * n * a_m / (-2 * cos(uM_ip1));
+dvr2 = -dvr1;
 
 % --- compute total delta‐V ---
 DV_op  = abs(dvn);        % out‐of‐plane impulse magnitude
 DV_ip1 = abs(dvr1);       % in‐plane impulse at u = 0
 DV_ip2 = abs(dvr2);       % in‐plane impulse at u = pi
 DV_tot = DV_op + DV_ip1 + DV_ip2;
+
+tmp = find(mask);  % list of indices in orbit 7
+[~,loc]    = min(abs(u_TSX(mask) - uM_ip1));
+idx_ip1    = tmp(loc);
+
+[~,loc]    = min(abs(u_TSX(mask) - uM_ip2));
+idx_ip2    = tmp(loc);
+
+[~,loc]    = min(abs(u_TSX(mask) - uM_op ));
+idx_op     = tmp(loc);
+
+for idx = 2:num_points
+
+    t_cur = t_grid(idx-1);
+    t_next = t_grid(idx);
+
+    TSX_ECI_cur = state_cur(7:12);
+    TDX_RTN_cur = state_cur(1:6);
+
+    % apply ΔV’s at the target indices
+    if idx == idx_ip1
+        TDX_RTN_cur(4) = TDX_RTN_cur(4) + dvr1;
+        fprintf('ip1\n');
+    end
+    if idx == idx_ip2
+        TDX_RTN_cur(4) = TDX_RTN_cur(4) + dvr2;
+        fprintf('ip2\n');
+    end
+    if idx == idx_op
+        TDX_RTN_cur(6) = TDX_RTN_cur(6) + dvn;
+        fprintf('op\n');
+    end
+
+    % write the modified RTN back into state_cur
+    state_cur(1:6)   = TDX_RTN_cur;
+
+    [TDX_ECI_cur, ~] = rtn2eci(TSX_ECI_cur, TDX_RTN_cur);
+
+    [~, state_next] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [t_cur, t_next]', state_cur,  dt);
+    state_next = state_next(2,:)';
+    state_out(idx,:) = state_next;
+
+    TSX_ECI_next = state_next(7:12);
+    TDX_RTN_next = state_next(1:6);
+    [TDX_ECI_next, R] = rtn2eci(TSX_ECI_next, TDX_RTN_next);
+    
+    a1 = TSX_oe(idx,1); e1 = TSX_oe(idx,2); i1 = TSX_oe(idx,3);
+    RAAN1 = TSX_oe(idx,4); omega1 = TSX_oe(idx,5);
+    M1 = wrapTo2Pi(TSX_oe(idx,6)); u1 = M1 + omega1;
+
+    TDX_params = rv2oe(TDX_ECI_next, mu);
+    TDX_oe_2(idx,:) = [TDX_params(1:5), true2mean(TDX_params(6), TDX_params(2))];
+    
+    a2 = TDX_oe_2(idx,1); e2 = TDX_oe_2(idx,2); i2 = TDX_oe_2(idx,3);
+    RAAN2 = TDX_oe_2(idx,4); omega2 = TDX_oe_2(idx,5);
+    M2 = wrapTo2Pi(TDX_oe_2(idx,6)); u2 = M2 + omega2;
+    
+    rel_oe_2(idx,:) = a1 * compute_roes([a1, e1, i1, RAAN1, omega1, M1], ...
+                                        [a2, e2, i2, RAAN2, omega2, M2])';
+
+    state_cur = state_next;
+
+end
 
 % --- print Delta‑V budget ---
 fprintf('\n=== ΔV Budget ===\n');
@@ -335,91 +392,52 @@ fprintf('Δi_y      = %.6e rad\n', Ddiy);
 fprintf('Δe_y      = %.6e    \n', Ddey);
 fprintf('Δλ (dlambda) = %.6e rad\n', Ddlambda);
 
-%Post manuever propagation
-TDX_init_oe_post = qns2oe(TSX_oe(num_points/2+1,:), rel_qns_post);
-[~, TDX_oe_post] = ode4(@compute_rates_GVE_J2, [tstart, tend/2]', TDX_init_oe_post, dt);
-TDX_oe_post(:,6) = wrapTo2Pi(TDX_oe_post(:,6));
+% ——— Visualization ———
 
-rel_oe_post = zeros(num_points/2, 6);
-rtn_post    = zeros(num_points/2, 6);
+% RTN‐frame relative motion
+figure;
+% TR plane: T on x, R on y
+subplot(3,1,1);
+plot(state_out(:,2), state_out(:,1), 'LineWidth',1.5);
+axis equal; grid on;
+xlabel('T [m]');    % or [km], whatever your units are
+ylabel('R [m]');
+title('RTN: TR plane');
 
-for idx = 1:num_points/2
-    
-    a1 = TSX_oe(num_points/2+idx,1); e1 = TSX_oe(num_points/2+idx,2); i1 = TSX_oe(num_points/2+idx,3);
-    RAAN1 = TSX_oe(num_points/2+idx,4); omega1 = TSX_oe(num_points/2+idx,5);
-    M1 = wrapTo2Pi(TSX_oe(num_points/2+idx,6)); u1 = M1 + omega1;
-    
-    a2 = TDX_oe_post(idx,1); e2 = TDX_oe_post(idx,2); i2 = TDX_oe_post(idx,3);
-    RAAN2 = TDX_oe_post(idx,4); omega2 = TDX_oe_post(idx,5);
-    M2 = wrapTo2Pi(TDX_oe_post(idx,6)); u2 = M2 + omega2;
-    
-    rel_oe_post(idx,:) = a1 * compute_roes([a1, e1, i1, RAAN1, omega1, M1], ...
-                                      [a2, e2, i2, RAAN2, omega2, M2])';
-    
-    r1 = oe2rv(TSX_oe(num_points/2+idx,:), mu);
-    r2 = oe2rv(TDX_oe_post(idx,:), mu);
-    rtn_post(idx,:) = eci2rtn(r1, r2)';
+% NR plane: N on x, R on y
+subplot(3,1,2);
+plot(state_out(:,3), state_out(:,1), 'LineWidth',1.5);
+axis equal; grid on;
+xlabel('N [m]');
+ylabel('R [m]');
+title('RTN: NR plane');
 
+% TN plane: T on x, N on y
+subplot(3,1,3);
+plot(state_out(:,2), state_out(:,3), 'LineWidth',1.5);
+axis equal; grid on;
+xlabel('T [m]');
+ylabel('N [m]');
+title('RTN: TN plane');
+
+% ——— Relative QNS elements vs. Orbit number ———
+% (assumes you have an integer vector 'orbit_num' of length num_points)
+figure;
+tiledlayout(3,2,'TileSpacing','compact','Padding','compact');
+
+% human‐readable labels
+labels = {'\delta a [m]',...
+          '\delta\lambda [rad]',...
+          '\delta e_x',...
+          '\delta e_y',...
+          '\delta i_x',...
+          '\delta i_y'};
+
+for k = 1:6
+    nexttile;
+    plot(orbit_num, rel_oe_2(:,k), 'LineWidth',1.5);
+    grid on;
+    xlabel('Orbit Number');
+    ylabel(labels{k});
+    title(labels{k});
 end
-
-% RTN frame: pre- and post-maneuver
-rR_pre  = rtn_pre(:,1); 
-rT_pre  = rtn_pre(:,2); 
-rN_pre  = rtn_pre(:,3);
-rR_post = rtn_post(:,1);
-rT_post = rtn_post(:,2);
-rN_post = rtn_post(:,3);
-
-figure;
-subplot(1,3,1)
-plot(rT_pre,  rR_pre,  'b-', ...
-     rT_post, rR_post, 'r--'); grid on; axis equal
-xlabel('r_T [m]'); ylabel('r_R [m]');
-title('RT plane'); legend('Pre','Post')
-
-subplot(1,3,2)
-plot(rN_pre,  rR_pre,  'b-', ...
-     rN_post, rR_post, 'r--'); grid on; axis equal
-xlabel('r_N [m]'); ylabel('r_R [m]');
-title('NR plane'); legend('Pre','Post')
-
-subplot(1,3,3)
-plot(rT_pre,  rN_pre,  'b-', ...
-     rT_post, rN_post, 'r--'); grid on; axis equal
-xlabel('r_T [m]'); ylabel('r_N [m]');
-title('TN plane'); legend('Pre','Post')
-
-
-% Relative orbital elements: pre- and post-maneuver
-da_pre      = rel_oe_pre(:,1);
-dex_pre     = rel_oe_pre(:,2);
-dey_pre     = rel_oe_pre(:,3);
-dix_pre     = rel_oe_pre(:,4);
-diy_pre     = rel_oe_pre(:,5);
-dlambda_pre = rel_oe_pre(:,6);
-
-da_post      = rel_oe_post(:,1);
-dex_post     = rel_oe_post(:,2);
-dey_post     = rel_oe_post(:,3);
-dix_post     = rel_oe_post(:,4);
-diy_post     = rel_oe_post(:,5);
-dlambda_post = rel_oe_post(:,6);
-
-figure;
-subplot(1,3,1)
-plot(da_pre,      dlambda_pre,      'b-', ...
-     da_post,     dlambda_post,     'r--'); grid on; axis equal
-xlabel('a\delta a [m]'); ylabel('a\delta \lambda [m]');
-title('a\delta a vs a\delta \lambda'); legend('Pre','Post')
-
-subplot(1,3,2)
-plot(dex_pre,     dey_pre,          'b-', ...
-     dex_post,    dey_post,         'r--'); grid on; axis equal
-xlabel('a\delta e_x [m]'); ylabel('a\delta e_y [m]');
-title('a\delta e_x vs a\delta e_y'); legend('Pre','Post')
-
-subplot(1,3,3)
-plot(dix_pre,     diy_pre,          'b-', ...
-     dix_post,    diy_post,         'r--'); grid on; axis equal
-xlabel('a\delta i_x [m]'); ylabel('a\delta i_y [m]');
-title('a\delta i_x vs a\delta i_y'); legend('Pre','Post')
