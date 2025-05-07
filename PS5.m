@@ -300,13 +300,13 @@ Ddlambda = rel_qns_post(2) - rel_qns_pre(2);
 a_m = TSX_oe(num_points/2,1);
 
 %out of plane portion
-uM_op = pi/2;
+uM_op = pi/2
 dvn = Ddiy * n / sin(uM_op);
 
 %in plane portion
 dvt = 0.0; %because we dont want sma change, we can set this to 0 and choose dvr to satisfy change in dey
-uM_ip1 = 0.0;
-uM_ip2 = pi - uM_ip1;
+uM_ip1 = 0.0
+uM_ip2 = pi - uM_ip1
 dvr1 = Ddey * n * a_m / (-2 * cos(uM_ip1));
 dvr2 = -dvr1;
 
@@ -394,48 +394,74 @@ fprintf('Δλ (dlambda) = %.6e rad\n', Ddlambda);
 
 % ——— Visualization ———
 
-% RTN‐frame relative motion
+% 1) Define split points for three segments
+idxs = unique([1, idx_ip1, idx_ip2, num_points]);
+nSeg = numel(idxs) - 1;
+
+% 2) Colormap & legend labels
+colors = lines(nSeg);
+legend_labels = { ...
+    'Before Maneuvers', ...
+    'After \delta v_r_1', ...
+    'After \delta v_r_2 and \delta v_t' ...
+};
+
+% ——— RTN‑frame relative motion ———
 figure;
+
 % TR plane: T on x, R on y
-subplot(3,1,1);
-plot(state_out(:,2), state_out(:,1), 'LineWidth',1.5);
+subplot(1,3,1); hold on;
+for s = 1:nSeg
+    segStart = idxs(s);
+    segEnd   = min(idxs(s+1), num_points);
+    if segStart < segEnd
+        seg = segStart:segEnd;
+        plot(state_out(seg,2), state_out(seg,1), 'Color', colors(s,:));
+    end
+end
+hold off;
 axis equal; grid on;
-xlabel('T [m]');    % or [km], whatever your units are
-ylabel('R [m]');
+xlabel('T [m]'); ylabel('R [m]');
 title('RTN: TR plane');
+% only one legend for the entire RTN figure
+legend(legend_labels, 'Location', 'best');
 
 % NR plane: N on x, R on y
-subplot(3,1,2);
-plot(state_out(:,3), state_out(:,1), 'LineWidth',1.5);
+subplot(1,3,2); hold on;
+for s = 1:nSeg
+    seg = idxs(s):min(idxs(s+1), num_points);
+    plot(state_out(seg,3), state_out(seg,1), 'Color', colors(s,:));
+end
+hold off;
 axis equal; grid on;
-xlabel('N [m]');
-ylabel('R [m]');
+xlabel('N [m]'); ylabel('R [m]');
 title('RTN: NR plane');
 
 % TN plane: T on x, N on y
-subplot(3,1,3);
-plot(state_out(:,2), state_out(:,3), 'LineWidth',1.5);
+subplot(1,3,3); hold on;
+for s = 1:nSeg
+    seg = idxs(s):min(idxs(s+1), num_points);
+    plot(state_out(seg,2), state_out(seg,3), 'Color', colors(s,:));
+end
+hold off;
 axis equal; grid on;
-xlabel('T [m]');
-ylabel('N [m]');
+xlabel('T [m]'); ylabel('N [m]');
 title('RTN: TN plane');
 
 % ——— Relative QNS elements vs. Orbit number ———
-% (assumes you have an integer vector 'orbit_num' of length num_points)
 figure;
 tiledlayout(3,2,'TileSpacing','compact','Padding','compact');
 
-% human‐readable labels
-labels = {'\delta a [m]',...
-          '\delta\lambda [rad]',...
-          '\delta e_x',...
-          '\delta e_y',...
-          '\delta i_x',...
-          '\delta i_y'};
+labels = {'a\delta a [m]', ...
+          'a\delta\lambda [rad]', ...
+          'a\delta e_x', ...
+          'a\delta e_y', ...
+          'a\delta i_x', ...
+          'a\delta i_y'};
 
 for k = 1:6
     nexttile;
-    plot(orbit_num, rel_oe_2(:,k), 'LineWidth',1.5);
+    plot(orbit_num, rel_oe_2(:,k));
     grid on;
     xlabel('Orbit Number');
     ylabel(labels{k});
