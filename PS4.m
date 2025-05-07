@@ -19,7 +19,7 @@ RAAN_TSX_init_1 = deg2rad(351.0108);
 omega_TSX_init_1 = deg2rad(101.2452);
 M_TSX_init_1 = deg2rad(11.6520);
 nu_TSX_init_1 = mean2true(M_TSX_init_1, e_TSX_init_1,tol);
-u_TSX_init_1 = nu_TSX_init_1 + omega_TSX_init_1;
+u_TSX_init_1 = M_TSX_init_1 + omega_TSX_init_1;
 
 %initial deputy elements - changed to have similar separation for R,T,N
 a_TDX_init_1 =  6886536.686;
@@ -140,7 +140,7 @@ for idx = 1:num_points
     nu_TSX_osc_1      = TSX_params_1(6);
     e_vec_TSX_osc_1   = TSX_params_1(11:12);
     M_TSX_osc_1       = true2mean(nu_TSX_osc_1, e_TSX_osc_1);
-    u_TSX_osc_1       = M_TSX_osc_1 + omega_TSX_osc_1;
+    u_TSX_osc_1       = wrapTo2Pi(M_TSX_osc_1 + omega_TSX_osc_1);
     TSX_osc_1(idx,:)  = [a_TSX_osc_1, e_vec_TSX_osc_1(:)', i_TSX_osc_1, RAAN_TSX_osc_1, u_TSX_osc_1];
 
     TSX_mean_oe_1     = osc2mean([a_TSX_osc_1, e_TSX_osc_1, i_TSX_osc_1, ...
@@ -153,7 +153,8 @@ for idx = 1:num_points
     M_TSX_mean_1      = TSX_mean_oe_1(6);
     ex_TSX_mean_1     = e_TSX_mean_1*cos(omega_TSX_mean_1);
     ey_TSX_mean_1     = e_TSX_mean_1*sin(omega_TSX_mean_1);
-    u_TSX_mean_1      = M_TSX_mean_1 + omega_TSX_mean_1;
+    nu_TSX_mean_1     = mean2true(M_TSX_mean_1, e_TSX_mean_1, tol);
+    u_TSX_mean_1      = wrapTo2Pi(M_TSX_mean_1 + omega_TSX_mean_1);
     TSX_mean_1(idx,:) = [a_TSX_mean_1, ex_TSX_mean_1, ey_TSX_mean_1, ...
                          i_TSX_mean_1, RAAN_TSX_mean_1, u_TSX_mean_1];
 
@@ -165,7 +166,7 @@ for idx = 1:num_points
     nu_TDX_osc_1      = TDX_params_1(6);
     e_vec_TDX_osc_1   = TDX_params_1(11:12);
     M_TDX_osc_1       = true2mean(nu_TDX_osc_1, e_TDX_osc_1);
-    u_TDX_osc_1       = M_TDX_osc_1 + omega_TDX_osc_1;
+    u_TDX_osc_1       = wrapTo2Pi(M_TDX_osc_1 + omega_TDX_osc_1);
     TDX_osc_1(idx,:)  = [a_TDX_osc_1, e_vec_TDX_osc_1(:)', i_TDX_osc_1, ...
                          RAAN_TDX_osc_1, u_TDX_osc_1];
 
@@ -179,19 +180,18 @@ for idx = 1:num_points
     M_TDX_mean_1      = TDX_mean_oe_1(6);
     ex_TDX_mean_1     = e_TDX_mean_1*cos(omega_TDX_mean_1);
     ey_TDX_mean_1     = e_TDX_mean_1*sin(omega_TDX_mean_1);
-    u_TDX_mean_1      = M_TDX_mean_1 + omega_TDX_mean_1;
+    nu_TDX_mean_1     = mean2true(M_TDX_mean_1, e_TDX_mean_1, tol);
+    u_TDX_mean_1      = wrapTo2Pi(M_TDX_mean_1 + omega_TDX_mean_1);
     TDX_mean_1(idx,:) = [a_TDX_mean_1, ex_TDX_mean_1, ey_TDX_mean_1, ...
                          i_TDX_mean_1, RAAN_TDX_mean_1, u_TDX_mean_1];
 
-    rel_osc_qns_1(idx,:) = a_TSX_osc_1*compute_roes(a_TSX_osc_1, i_TSX_osc_1, e_TSX_osc_1, ...
-                                        RAAN_TSX_osc_1, u_TSX_osc_1, ...
-                                        a_TDX_osc_1, i_TDX_osc_1, e_TDX_osc_1, ...
-                                        RAAN_TDX_osc_1, u_TDX_osc_1);
+    rel_osc_qns_1(idx,:)    = a_TSX_osc_1     * compute_roes(...
+                            [a_TSX_osc_1, e_TSX_osc_1, i_TSX_osc_1, RAAN_TSX_osc_1, omega_TSX_osc_1, M_TSX_osc_1], ...
+                            [a_TDX_osc_1, e_TDX_osc_1, i_TDX_osc_1, RAAN_TDX_osc_1, omega_TDX_osc_1, M_TDX_osc_1]);
 
-    rel_mean_qns_1(idx,:)= a_TSX_mean_1*compute_roes(a_TSX_mean_1, i_TSX_mean_1, e_TSX_mean_1, ...
-                                        RAAN_TSX_mean_1, u_TSX_mean_1, ...
-                                        a_TDX_mean_1, i_TDX_mean_1, e_TDX_mean_1, ...
-                                        RAAN_TDX_mean_1, u_TDX_mean_1);
+    rel_mean_qns_1(idx,:)   = a_TSX_mean_1    * compute_roes(...
+                            [a_TSX_mean_1, e_TSX_mean_1, i_TSX_mean_1, RAAN_TSX_mean_1, omega_TSX_mean_1, M_TSX_mean_1], ...
+                            [a_TDX_mean_1, e_TDX_mean_1, i_TDX_mean_1, RAAN_TDX_mean_1, omega_TDX_mean_1, M_TDX_mean_1]);
 
 
     % --- Set 1, with J2 ---
@@ -206,7 +206,7 @@ for idx = 1:num_points
     nu_TSX_J2_1      = TSX_params_J2_1(6);
     e_vec_TSX_J2_1   = TSX_params_J2_1(11:12);
     M_TSX_J2_1       = true2mean(nu_TSX_J2_1, e_TSX_J2_1);
-    u_TSX_J2_1       = M_TSX_J2_1 + omega_TSX_J2_1;
+    u_TSX_J2_1       = wrapTo2Pi(M_TSX_J2_1 + omega_TSX_J2_1);
     TSX_J2_osc_1(idx,:)= [a_TSX_J2_1, e_vec_TSX_J2_1(:)', i_TSX_J2_1, ...
                           RAAN_TSX_J2_1, u_TSX_J2_1];
 
@@ -220,7 +220,8 @@ for idx = 1:num_points
     M_TSX_J2_mean_1   = TSX_J2_mean_oe_1(6);
     ex_TSX_J2_mean_1  = e_TSX_J2_mean_1*cos(omega_TSX_J2_mean_1);
     ey_TSX_J2_mean_1  = e_TSX_J2_mean_1*sin(omega_TSX_J2_mean_1);
-    u_TSX_J2_mean_1   = M_TSX_J2_mean_1 + omega_TSX_J2_mean_1;
+    nu_TSX_J2_mean_1  = mean2true(M_TSX_J2_mean_1, e_TSX_J2_mean_1, tol);
+    u_TSX_J2_mean_1   = wrapTo2Pi(M_TSX_J2_mean_1 + omega_TSX_J2_mean_1);
     TSX_J2_mean_1(idx,:)= [a_TSX_J2_mean_1, ex_TSX_J2_mean_1, ey_TSX_J2_mean_1, ...
                            i_TSX_J2_mean_1, RAAN_TSX_J2_mean_1, u_TSX_J2_mean_1];
 
@@ -232,7 +233,7 @@ for idx = 1:num_points
     nu_TDX_J2_1      = TDX_params_J2_1(6);
     e_vec_TDX_J2_1   = TDX_params_J2_1(11:12);
     M_TDX_J2_1       = true2mean(nu_TDX_J2_1, e_TDX_J2_1);
-    u_TDX_J2_1       = M_TDX_J2_1 + omega_TDX_J2_1;
+    u_TDX_J2_1       = wrapTo2Pi(M_TDX_J2_1 + omega_TDX_J2_1);
     TDX_J2_osc_1(idx,:)= [a_TDX_J2_1, e_vec_TDX_J2_1(:)', i_TDX_J2_1, ...
                           RAAN_TDX_J2_1, u_TDX_J2_1];
 
@@ -246,18 +247,18 @@ for idx = 1:num_points
     M_TDX_J2_mean_1   = TDX_J2_mean_oe_1(6);
     ex_TDX_J2_mean_1  = e_TDX_J2_mean_1*cos(omega_TDX_J2_mean_1);
     ey_TDX_J2_mean_1  = e_TDX_J2_mean_1*sin(omega_TDX_J2_mean_1);
-    u_TDX_J2_mean_1   = M_TDX_J2_mean_1 + omega_TDX_J2_mean_1;
+    nu_TDX_J2_mean_1  = mean2true(M_TDX_J2_mean_1, e_TDX_J2_mean_1, tol);
+    u_TDX_J2_mean_1   = wrapTo2Pi(M_TDX_J2_mean_1 + omega_TDX_J2_mean_1);
     TDX_J2_mean_1(idx,:)= [a_TDX_J2_mean_1, ex_TDX_J2_mean_1, ey_TDX_J2_mean_1, ...
                            i_TDX_J2_mean_1, RAAN_TDX_J2_mean_1, u_TDX_J2_mean_1];
 
-    rel_J2_osc_qns_1(idx,:)= a_TSX_J2_1*compute_roes(a_TSX_J2_1, i_TSX_J2_1, e_TSX_J2_1, ...
-                                          RAAN_TSX_J2_1, u_TSX_J2_1, ...
-                                          a_TDX_J2_1, i_TDX_J2_1, e_TDX_J2_1, ...
-                                          RAAN_TDX_J2_1, u_TDX_J2_1);
-    rel_J2_mean_qns_1(idx,:)=a_TSX_J2_mean_1*compute_roes(a_TSX_J2_mean_1, i_TSX_J2_mean_1, e_TSX_J2_mean_1, ...
-                                          RAAN_TSX_J2_mean_1, u_TSX_J2_mean_1, ...
-                                          a_TDX_J2_mean_1, i_TDX_J2_mean_1, e_TDX_J2_mean_1, ...
-                                          RAAN_TDX_J2_mean_1, u_TDX_J2_mean_1);
+    rel_J2_osc_qns_1(idx,:) = a_TSX_J2_1      * compute_roes(...
+                            [a_TSX_J2_1, e_TSX_J2_1, i_TSX_J2_1, RAAN_TSX_J2_1, omega_TSX_J2_1, M_TSX_J2_1], ...
+                            [a_TDX_J2_1, e_TDX_J2_1, i_TDX_J2_1, RAAN_TDX_J2_1, omega_TDX_J2_1, M_TDX_J2_1]);
+
+    rel_J2_mean_qns_1(idx,:)= a_TSX_J2_mean_1 * compute_roes(...
+                            [a_TSX_J2_mean_1, e_TSX_J2_mean_1, i_TSX_J2_mean_1, RAAN_TSX_J2_mean_1, omega_TSX_J2_mean_1, M_TSX_J2_mean_1], ...
+                            [a_TDX_J2_mean_1, e_TDX_J2_mean_1, i_TDX_J2_mean_1, RAAN_TDX_J2_mean_1, omega_TDX_J2_mean_1, M_TDX_J2_mean_1]);
 
 
     % --- Set 2, no J2 ---
@@ -272,7 +273,7 @@ for idx = 1:num_points
     nu_TSX_osc_2      = TSX_params_2(6);
     e_vec_TSX_osc_2   = TSX_params_2(11:12);
     M_TSX_osc_2       = true2mean(nu_TSX_osc_2, e_TSX_osc_2);
-    u_TSX_osc_2       = M_TSX_osc_2 + omega_TSX_osc_2;
+    u_TSX_osc_2       = wrapTo2Pi(M_TSX_osc_2 + omega_TSX_osc_2);
     TSX_osc_2(idx,:)  = [a_TSX_osc_2, e_vec_TSX_osc_2(:)', i_TSX_osc_2, ...
                          RAAN_TSX_osc_2, u_TSX_osc_2];
 
@@ -286,7 +287,8 @@ for idx = 1:num_points
     M_TSX_mean_2      = TSX_mean_oe_2(6);
     ex_TSX_mean_2     = e_TSX_mean_2*cos(omega_TSX_mean_2);
     ey_TSX_mean_2     = e_TSX_mean_2*sin(omega_TSX_mean_2);
-    u_TSX_mean_2      = M_TSX_mean_2 + omega_TSX_mean_2;
+    nu_TSX_mean_2     = mean2true(M_TSX_mean_2, e_TSX_mean_2, tol);
+    u_TSX_mean_2      = wrapTo2Pi(M_TSX_mean_2 + omega_TSX_mean_2);
     TSX_mean_2(idx,:) = [a_TSX_mean_2, ex_TSX_mean_2, ey_TSX_mean_2, ...
                          i_TSX_mean_2, RAAN_TSX_mean_2, u_TSX_mean_2];
 
@@ -298,7 +300,7 @@ for idx = 1:num_points
     nu_TDX_osc_2      = TDX_params_2(6);
     e_vec_TDX_osc_2   = TDX_params_2(11:12);
     M_TDX_osc_2       = true2mean(nu_TDX_osc_2, e_TDX_osc_2);
-    u_TDX_osc_2       = M_TDX_osc_2 + omega_TDX_osc_2;
+    u_TDX_osc_2       = wrapTo2Pi(M_TDX_osc_2 + omega_TDX_osc_2);
     TDX_osc_2(idx,:)  = [a_TDX_osc_2, e_vec_TDX_osc_2(:)', i_TDX_osc_2, ...
                          RAAN_TDX_osc_2, u_TDX_osc_2];
 
@@ -312,18 +314,18 @@ for idx = 1:num_points
     M_TDX_mean_2      = TDX_mean_oe_2(6);
     ex_TDX_mean_2     = e_TDX_mean_2*cos(omega_TDX_mean_2);
     ey_TDX_mean_2     = e_TDX_mean_2*sin(omega_TDX_mean_2);
-    u_TDX_mean_2      = M_TDX_mean_2 + omega_TDX_mean_2;
+    nu_TDX_mean_2     = mean2true(M_TDX_mean_2, e_TDX_mean_2, tol);
+    u_TDX_mean_2      = wrapTo2Pi(M_TDX_mean_2 + omega_TDX_mean_2);
     TDX_mean_2(idx,:) = [a_TDX_mean_2, ex_TDX_mean_2, ey_TDX_mean_2, ...
                          i_TDX_mean_2, RAAN_TDX_mean_2, u_TDX_mean_2];
 
-    rel_osc_qns_2(idx,:)= a_TSX_osc_2*compute_roes(a_TSX_osc_2, i_TSX_osc_2, e_TSX_osc_2, ...
-                                        RAAN_TSX_osc_2, u_TSX_osc_2, ...
-                                        a_TDX_osc_2, i_TDX_osc_2, e_TDX_osc_2, ...
-                                        RAAN_TDX_osc_2, u_TDX_osc_2);
-    rel_mean_qns_2(idx,:)=a_TSX_mean_2*compute_roes(a_TSX_mean_2, i_TSX_mean_2, e_TSX_mean_2, ...
-                                       RAAN_TSX_mean_2, u_TSX_mean_2, ...
-                                       a_TDX_mean_2, i_TDX_mean_2, e_TDX_mean_2, ...
-                                       RAAN_TDX_mean_2, u_TDX_mean_2);
+    rel_osc_qns_2(idx,:)    = a_TSX_osc_2     * compute_roes(...
+                            [a_TSX_osc_2, e_TSX_osc_2, i_TSX_osc_2, RAAN_TSX_osc_2, omega_TSX_osc_2, M_TSX_osc_2], ...
+                            [a_TDX_osc_2, e_TDX_osc_2, i_TDX_osc_2, RAAN_TDX_osc_2, omega_TDX_osc_2, M_TDX_osc_2]);
+
+    rel_mean_qns_2(idx,:)   = a_TSX_mean_2    * compute_roes(...
+                            [a_TSX_mean_2, e_TSX_mean_2, i_TSX_mean_2, RAAN_TSX_mean_2, omega_TSX_mean_2, M_TSX_mean_2], ...
+                            [a_TDX_mean_2, e_TDX_mean_2, i_TDX_mean_2, RAAN_TDX_mean_2, omega_TDX_mean_2, M_TDX_mean_2]);
 
 
     % --- Set 2, with J2 ---
@@ -338,7 +340,7 @@ for idx = 1:num_points
     nu_TSX_J2_2      = TSX_params_J2_2(6);
     e_vec_TSX_J2_2   = TSX_params_J2_2(11:12);
     M_TSX_J2_2       = true2mean(nu_TSX_J2_2, e_TSX_J2_2);
-    u_TSX_J2_2       = M_TSX_J2_2 + omega_TSX_J2_2;
+    u_TSX_J2_2       = wrapTo2Pi(M_TSX_J2_2 + omega_TSX_J2_2);
     TSX_J2_osc_2(idx,:)= [a_TSX_J2_2, e_vec_TSX_J2_2(:)', i_TSX_J2_2, ...
                           RAAN_TSX_J2_2, u_TSX_J2_2];
 
@@ -352,7 +354,8 @@ for idx = 1:num_points
     M_TSX_J2_mean_2   = TSX_J2_mean_oe_2(6);
     ex_TSX_J2_mean_2  = e_TSX_J2_mean_2*cos(omega_TSX_J2_mean_2);
     ey_TSX_J2_mean_2  = e_TSX_J2_mean_2*sin(omega_TSX_J2_mean_2);
-    u_TSX_J2_mean_2   = M_TSX_J2_mean_2 + omega_TSX_J2_mean_2;
+    nu_TSX_J2_mean_2  = mean2true(M_TSX_J2_mean_2, e_TSX_J2_mean_2, tol);
+    u_TSX_J2_mean_2   = wrapTo2Pi(M_TSX_J2_mean_2 + omega_TSX_J2_mean_2);
     TSX_J2_mean_2(idx,:)= [a_TSX_J2_mean_2, ex_TSX_J2_mean_2, ey_TSX_J2_mean_2, ...
                            i_TSX_J2_mean_2, RAAN_TSX_J2_mean_2, u_TSX_J2_mean_2];
 
@@ -364,7 +367,7 @@ for idx = 1:num_points
     nu_TDX_J2_2      = TDX_params_J2_2(6);
     e_vec_TDX_J2_2   = TDX_params_J2_2(11:12);
     M_TDX_J2_2       = true2mean(nu_TDX_J2_2, e_TDX_J2_2);
-    u_TDX_J2_2       = M_TDX_J2_2 + omega_TDX_J2_2;
+    u_TDX_J2_2       = wrapTo2Pi(M_TDX_J2_2 + omega_TDX_J2_2);
     TDX_J2_osc_2(idx,:)= [a_TDX_J2_2, e_vec_TDX_J2_2(:)', i_TDX_J2_2, ...
                           RAAN_TDX_J2_2, u_TDX_J2_2];
 
@@ -378,18 +381,18 @@ for idx = 1:num_points
     M_TDX_J2_mean_2   = TDX_J2_mean_oe_2(6);
     ex_TDX_J2_mean_2  = e_TDX_J2_mean_2*cos(omega_TDX_J2_mean_2);
     ey_TDX_J2_mean_2  = e_TDX_J2_mean_2*sin(omega_TDX_J2_mean_2);
-    u_TDX_J2_mean_2   = M_TDX_J2_mean_2 + omega_TDX_J2_mean_2;
+    nu_TDX_J2_mean_2  = mean2true(M_TDX_J2_mean_2, e_TDX_J2_mean_2, tol);
+    u_TDX_J2_mean_2   = wrapTo2Pi(M_TDX_J2_mean_2 + omega_TDX_J2_mean_2);
     TDX_J2_mean_2(idx,:)= [a_TDX_J2_mean_2, ex_TDX_J2_mean_2, ey_TDX_J2_mean_2, ...
                            i_TDX_J2_mean_2, RAAN_TDX_J2_mean_2, u_TDX_J2_mean_2];
 
-    rel_J2_osc_qns_2(idx,:)= a_TSX_J2_2*compute_roes(a_TSX_J2_2, i_TSX_J2_2, e_TSX_J2_2, ...
-                                          RAAN_TSX_J2_2, u_TSX_J2_2, ...
-                                          a_TDX_J2_2, i_TDX_J2_2, e_TDX_J2_2, ...
-                                          RAAN_TDX_J2_2, u_TDX_J2_2);
-    rel_J2_mean_qns_2(idx,:)=a_TSX_J2_mean_2*compute_roes(a_TSX_J2_mean_2, i_TSX_J2_mean_2, e_TSX_J2_mean_2, ...
-                                          RAAN_TSX_J2_mean_2, u_TSX_J2_mean_2, ...
-                                          a_TDX_J2_mean_2, i_TDX_J2_mean_2, e_TDX_J2_mean_2, ...
-                                          RAAN_TDX_J2_mean_2, u_TDX_J2_mean_2);
+    rel_J2_osc_qns_2(idx,:) = a_TSX_J2_2      * compute_roes(...
+                            [a_TSX_J2_2, e_TSX_J2_2, i_TSX_J2_2, RAAN_TSX_J2_2, omega_TSX_J2_2, M_TSX_J2_2], ...
+                            [a_TDX_J2_2, e_TDX_J2_2, i_TDX_J2_2, RAAN_TDX_J2_2, omega_TDX_J2_2, M_TDX_J2_2]);
+
+    rel_J2_mean_qns_2(idx,:)= a_TSX_J2_mean_2 * compute_roes(...
+                            [a_TSX_J2_mean_2, e_TSX_J2_mean_2, i_TSX_J2_mean_2, RAAN_TSX_J2_mean_2, omega_TSX_J2_mean_2, M_TSX_J2_mean_2], ...
+                            [a_TDX_J2_mean_2, e_TDX_J2_mean_2, i_TDX_J2_mean_2, RAAN_TDX_J2_mean_2, omega_TDX_J2_mean_2, M_TDX_J2_mean_2]);
 
 end
 
@@ -638,6 +641,7 @@ for idx = 1:num_points
     M_TSX_J2_mean_2   = TSX_J2_mean_oe_2(6);
     ex_TSX_J2_mean_2  = e_TSX_J2_mean_2*cos(omega_TSX_J2_mean_2);
     ey_TSX_J2_mean_2  = e_TSX_J2_mean_2*sin(omega_TSX_J2_mean_2);
+    nu_TSX_J2_mean_2  = mean2true(M_TSX_J2_mean_2, e_TSX_J2_mean_2, tol);
     u_TSX_J2_mean_2   = M_TSX_J2_mean_2 + omega_TSX_J2_mean_2;
     TSX_J2_mean_2(idx,:)= [a_TSX_J2_mean_2, ex_TSX_J2_mean_2, ey_TSX_J2_mean_2, ...
                            i_TSX_J2_mean_2, RAAN_TSX_J2_mean_2, u_TSX_J2_mean_2];
@@ -664,18 +668,18 @@ for idx = 1:num_points
     M_TDX_J2_mean_2   = TDX_J2_mean_oe_2(6);
     ex_TDX_J2_mean_2  = e_TDX_J2_mean_2*cos(omega_TDX_J2_mean_2);
     ey_TDX_J2_mean_2  = e_TDX_J2_mean_2*sin(omega_TDX_J2_mean_2);
+    nu_TDX_J2_mean_2  = mean2true(M_TDX_J2_mean_2, e_TDX_J2_mean_2, tol);
     u_TDX_J2_mean_2   = M_TDX_J2_mean_2 + omega_TDX_J2_mean_2;
     TDX_mean_oe_g(idx,:)= [a_TDX_J2_mean_2, ex_TDX_J2_mean_2, ey_TDX_J2_mean_2, ...
                            i_TDX_J2_mean_2, RAAN_TDX_J2_mean_2, u_TDX_J2_mean_2];
 
-    rel_osc_g(idx,:)= a_TSX_J2_2*compute_roes(a_TSX_J2_2, i_TSX_J2_2, e_TSX_J2_2, ...
-                                          RAAN_TSX_J2_2, u_TSX_J2_2, ...
-                                          a_TDX_J2_2, i_TDX_J2_2, e_TDX_J2_2, ...
-                                          RAAN_TDX_J2_2, u_TDX_J2_2);
-    rel_mean_g(idx,:)=a_TSX_J2_mean_2*compute_roes(a_TSX_J2_mean_2, i_TSX_J2_mean_2, e_TSX_J2_mean_2, ...
-                                          RAAN_TSX_J2_mean_2, u_TSX_J2_mean_2, ...
-                                          a_TDX_J2_mean_2, i_TDX_J2_mean_2, e_TDX_J2_mean_2, ...
-                                          RAAN_TDX_J2_mean_2, u_TDX_J2_mean_2);
+    rel_osc_g(idx,:)        = a_TSX_J2_2      * compute_roes(...
+                            [a_TSX_J2_2, e_TSX_J2_2, i_TSX_J2_2, RAAN_TSX_J2_2, omega_TSX_J2_2, M_TSX_J2_2], ...
+                            [a_TDX_J2_2, e_TDX_J2_2, i_TDX_J2_2, RAAN_TDX_J2_2, omega_TDX_J2_2, M_TDX_J2_2]);
+
+    rel_mean_g(idx,:)       = a_TSX_J2_mean_2 * compute_roes(...
+                            [a_TSX_J2_mean_2, e_TSX_J2_mean_2, i_TSX_J2_mean_2, RAAN_TSX_J2_mean_2, omega_TSX_J2_mean_2, M_TSX_J2_mean_2], ...
+                            [a_TDX_J2_mean_2, e_TDX_J2_mean_2, i_TDX_J2_mean_2, RAAN_TDX_J2_mean_2, omega_TDX_J2_mean_2, M_TDX_J2_mean_2]);
 
 end
 
@@ -788,7 +792,7 @@ plot(rel_J2_mean_qns_2(:,3),rel_J2_mean_qns_2(:,4), '-.');
 axis equal; grid on;
 xlabel('a\delta e_x [m]');
 ylabel('a\delta e_y [m]');
-legend('STM‐Propagated ROE (2)', 'J_2 Osculating QNS (6)', 'J_2 Mean QNS (6)','Location','best');
+legend('STM‐Propagated ROE (2)', 'Osculating QNS (2)', 'Mean QNS (2)','Location','best');
 
 figure;
 plot(roes_6_h(:,3),  roes_6_h(:,4),          '-'); hold on;
@@ -806,7 +810,7 @@ plot(rel_J2_mean_qns_2(:,5),rel_J2_mean_qns_2(:,6), '-.');
 axis equal; grid on;
 xlabel('a\delta i_x [m]');
 ylabel('a\delta i_y [m]');
-legend('STM‐Propagated ROE (2)', 'Osculating QNS (2)', 'J_2 Mean QNS (2)','Location','best');
+legend('STM‐Propagated ROE (2)', 'Osculating QNS (2)', 'Mean QNS (2)','Location','best');
 
 figure;
 plot(roes_6_h(:,5),  roes_6_h(:,6),          '-'); hold on;

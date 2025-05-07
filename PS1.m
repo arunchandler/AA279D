@@ -73,8 +73,8 @@ nu_TDX_2 = mean2true(M_TDX_2, e_TDX_2,tol);
 u_TSX_2 = nu_TSX_2 + omega_TSX_2;
 u_TDX_2 = nu_TDX_2 + omega_TDX_2;
 
-roe_1 = compute_roes(a_TSX_1, i_TSX_1, e_TSX_1, RAAN_TSX_1, u_TSX_1, a_TDX_1, i_TDX_1, e_TDX_1, RAAN_TDX_1, u_TDX_1);
-roe_2 = compute_roes(a_TSX_2, i_TSX_2, e_TSX_2, RAAN_TSX_2, u_TSX_2, a_TDX_2, i_TDX_2, e_TDX_2, RAAN_TDX_2, u_TDX_2);
+roe_1 = compute_roes([a_TSX_1, i_TSX_1, e_TSX_1, RAAN_TSX_1, omega_TSX_1, M_TSX_1], [a_TDX_1, i_TDX_1, e_TDX_1, RAAN_TDX_1, omega_TDX_1, M_TDX_1]);
+roe_2 = compute_roes([a_TSX_2, i_TSX_2, e_TSX_2, RAAN_TSX_2, omega_TSX_2, M_TSX_2], [a_TDX_2, i_TDX_2, e_TDX_2, RAAN_TDX_2, omega_TDX_2, M_TDX_2]);
 
 % Print ROEs for June 21, 2010
 fprintf('\nRelative Orbital Elements (ROEs) for June 21, 2010:\n');

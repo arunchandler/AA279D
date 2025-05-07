@@ -57,4 +57,5 @@ function [state_rtn, R_eci2rtn] = eci2rtn(chief_state, deputy_state)
     
     state_rtn = [r_rtn; v_rtn];
     R_eci2rtn = C;
+    
 end
