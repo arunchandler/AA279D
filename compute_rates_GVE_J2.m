@@ -1,4 +1,4 @@
-function [oe_dot] = compute_rates_rv_perturbed(~, oe)
+function [oe_dot] = compute_rates_GVE_J2(~, oe)
     % oe = [a; e; i; Omega; omega; M]
     % returns oe_dot = [da; de; di; dOmega; domega; dM]
     
