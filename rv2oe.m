@@ -62,5 +62,5 @@ function params = rv2oe(X, mu)
 
     e_vec_perifocal = [e*cos(omega), e*sin(omega)];
 
-    params = [a, e, wrapTo2Pi(i), wrapTo2Pi(RAAN), wrapTo2Pi(omega), wrapTo2Pi(nu), energy, h', e_vec_perifocal];
+    params = [a, e, wrapTo2Pi(i), wrapTo2Pi(RAAN), wrapTo2Pi(omega), wrapTo2Pi(nu), energy, h(:).', e_vec_perifocal];
 end

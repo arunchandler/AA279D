@@ -9,8 +9,6 @@
 
 function E = true2ecc(f, e)
 
-
-
 f = wrapTo2Pi(f);
 
 E = 2*atan(sqrt((1-e)/(1+e)) * tan(f/2));

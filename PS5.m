@@ -21,17 +21,17 @@ scenario = input( ...
 switch scenario
     case 1
         % M-D2
-        rel_qns_init = [0, 0, 0, 300, 0, 400];
+        rel_qns_init = [0, 1, 0, 300, 0, 400];
         scenario_name = 'M-C';
         
     case 2
         % M-D3
-        rel_qns_init = [0, 0, 0, 300, 0, 500];  
+        rel_qns_init = [0, 1, 0, 300, 0, 500];  
         scenario_name = 'M-D1';
         
     case 3
         % M-D4
-        rel_qns_init = [0, 0, 0, 500, 0, 300];  
+        rel_qns_init = [0, 1, 0, 500, 0, 300];  
         scenario_name = 'M-E';
         
     otherwise
@@ -49,7 +49,7 @@ RAAN_TSX_init = deg2rad(351.0108);
 omega_TSX_init= deg2rad(101.2452);
 M_TSX_init    = deg2rad(11.6520);
 nu_TSX_init   = mean2true(M_TSX_init, e_TSX_init, tol);
-u_TSX_init    = nu_TSX_init + omega_TSX_init;
+u_TSX_init    = M_TSX_init + omega_TSX_init;
 
 TSX_init_oe = [a_TSX_init, e_TSX_init, i_TSX_init, ...
                RAAN_TSX_init, omega_TSX_init, M_TSX_init];
@@ -57,7 +57,7 @@ TSX_init_oe = [a_TSX_init, e_TSX_init, i_TSX_init, ...
 % map to TDX via your chosen rel_qns_init
 TDX_init_oe = qns2oe(TSX_init_oe, rel_qns_init);
 
-% timing parameters, propagation, etc. (unchanged)
+% timing parameters
 tstart     = 0.0;
 n          = sqrt(mu/a_TSX_init^3);
 T          = 2*pi/n;
@@ -241,6 +241,7 @@ title('Relative OE: a\delta i_x vs a\delta i_y');
 legend('Propagated','STM','Location','best');
 
 %% Problem 2 - reconfiguration
+
 
 scenario = input( ...
     ['Select reconfiguration scenario:\n' ...
