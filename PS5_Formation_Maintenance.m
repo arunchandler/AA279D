@@ -57,12 +57,12 @@ fprintf('Running scenario "%s": rel_qns_init = [%g %g %g %g %g %g]\n\n', ...
         scenario_name, rel_qns_init);
 
 % initial chief elements
-a_TSX_init    = 6892944.65;  % m
-e_TSX_init    = 0.00013700;
-i_TSX_init    = deg2rad(97.440124);
-RAAN_TSX_init = deg2rad(104.274891);
-omega_TSX_init= deg2rad(67.975723);
-M_TSX_init    = deg2rad(292.169756);
+a_TSX_init    = 6886536.686;  % m
+e_TSX_init    = 0.0001264;
+i_TSX_init    = deg2rad(97.4453);
+RAAN_TSX_init = deg2rad(351.0108);
+omega_TSX_init= deg2rad(101.2452);
+M_TSX_init    = deg2rad(11.6520);
 nu_TSX_init   = mean2true(M_TSX_init, e_TSX_init, tol);
 u_TSX_init    = nu_TSX_init + omega_TSX_init;
 
@@ -255,188 +255,185 @@ title('Relative OE: a\delta i_x vs a\delta i_y');
 legend('Propagated','STM','Location','best');
 
 
-% === CONTROL SECTION: Initialize ===
-a = a_TSX_init;
-v = sqrt(mu / a);
-maneuver_log = [];
+%% === CONTROL SECTION: Initialize ===
+roe_target = [0, 0, 0, 300, 0, -1000];
 
-% Target (nominal) ROE [δa, δλ, δeₓ, δeᵧ, δiₓ, δiᵧ] in meters
-roe_target = [0; 0; 0; 300; 0; -1000];
 
-% Maneuver detection threshold (angle between e/i vectors)
-angle_thresh_deg = 7;  % degrees
+%% === 1) DETECTION & Δv CALCULATION ===
+a_chief = a_TSX_init;                     % chief SMA  [m]
+n       = sqrt(mu/a_chief^3);             % mean motion [rad s-1]
 
-% === Loop through to detect maneuver triggers and compute Δv ===
+% ---- nominal windows (in metres) --------------------------------------
+delta_e_max_m = 2.0;                      % half-window ‖a·δe‖
+delta_i_max_m = 2.0;                      % half-window ‖a·δi‖
+
+% ---- convert the “design” numbers & ROE targets to dimension-less -----
+e_nom_hat = roe_target(3:4)/a_chief;      % δe_nom   (-)
+i_nom_hat = roe_target(5:6)/a_chief;      % δi_nom   (-)
+de_max    = delta_e_max_m/a_chief;        % ‖δe‖ window (-)
+di_max    = delta_i_max_m/a_chief;        % ‖δi‖ window (-)
+
+angle_thresh_deg = 7;                     % trigger geometry
+T_half = pi/n;                            % ½-orbit time [s]
+v_chief = sqrt(mu / a_chief);
+% helper: 2-D rotation about +z
+Rz = @(phi)[cos(phi) -sin(phi); sin(phi) cos(phi)];
+
+maneuver_log = [];                        % save first cycle only
+
 for idx = 1:num_points
-    roe_now = rel_oe(idx,:)';
-    delta_e_vec = roe_now(3:4);
-    delta_i_vec = roe_now(5:6);
-
-    % Angle between e and i vectors
-    cos_angle = dot(delta_e_vec, delta_i_vec) / (norm(delta_e_vec) * norm(delta_i_vec));
-    angle_rad = acos(max(min(cos_angle, 1), -1));  % Clamp for numerical safety
-    angle_deg = rad2deg(angle_rad);
-    sep_deg = min(angle_deg, abs(180 - angle_deg));  % True angular separation    
-    if mod(t_orbit(idx), 10) < dt/T  % approximately once per orbit
-        fprintf('[%.2f orbits] e/i angle separation = %.2f°\n', t_orbit(idx), sep_deg);
-    end
-
-    % Check if vectors are sufficiently misaligned AND no prior trigger
-    if sep_deg > angle_thresh_deg && isempty(maneuver_log)
-
-        % 1) compute chief’s current u_c
-        M_c   = wrapTo2Pi(TSX_oe(idx,6));                % mean anomaly
-        nu_c  = mean2true(M_c, TSX_oe(idx,2), tol);      % true anomaly
-        u_c   = wrapTo2Pi(nu_c + TSX_oe(idx,5));         % argument of latitude
-
-
-        % Normalize error terms (unitless)
-        delta_e_err = (delta_e_vec - roe_target(3:4)) / a;
-        delta_a_err = (roe_now(1) - roe_target(1)) / a;
-
-        delta_e_mag = norm(delta_e_err);
-
-        % Δv computation
-        dvt1 = (v/4)*(delta_e_mag + delta_a_err);
-        dvt2 = -(v/4)*(delta_e_mag - delta_a_err);
-
-        % Maneuver phasing (location)
-        u1 = atan2(delta_e_err(2), delta_e_err(1));
-        u2 = mod(u1 + pi, 2*pi);
-
-        % 3) now log everything **including** u_c
-        maneuver_log = [maneuver_log; struct( ...
-            'idx',      idx, ...
-            't',        t_grid(idx), ...
-            'dvt1',     dvt1, ...
-            'dvt2',     dvt2, ...
-            'u1',       u1, ...
-            'u2',       u2, ...
-            'u_c',      u_c, ...           % <<< new field
-            'sep_deg',  sep_deg, ...
-            'delta_e_err', delta_e_err )];
-
-        fprintf('[%.2f orbits] Trigger: Δv_T1=%.4f m/s, Δv_T2=%.4f m/s, sep=%.2f°\n', ...
-                t_orbit(idx), dvt1, dvt2, sep_deg);
-
+    
+    % ---------- current relative elements (dimension-less) -------------
+    roe_hat  = rel_oe(idx,:)'/a_chief;    % [δa δλ δex δey δix δiy]'
+    da_hat   = roe_hat(1);                % δa
+    de_hat   = roe_hat(3:4);              % δe  (x,y)
+    di_hat   = roe_hat(5:6);              % δi  (x,y)
+    
+    % ---------- chief argument of latitude (for timing) ----------------
+    M_c  = wrapTo2Pi(TSX_oe(idx,6));
+    nu_c = mean2true(M_c, TSX_oe(idx,2), tol);
+    u_c  = wrapTo2Pi(nu_c + TSX_oe(idx,5));
+    
+    % ===================================================================
+    % 1)   Post-manoeuvre targets  (Eqs. 2.58–2.62)  — *all dimension-less*
+    % ===================================================================
+    gamma   = 0.75*J2*(Re/a_chief)^2;
+    phi_dot = 1.5*gamma*(5*cos(i_TSX_init)^2 - 1);   % sign only is needed
+    dphi    = sign(phi_dot)*asin(de_max/ norm(e_nom_hat));
+    
+    de_man_hat = (Rz(dphi)*e_nom_hat.').';                  % Eq. (2.58)
+    di_man_hat = [ i_nom_hat(1);
+                   i_nom_hat(2) - sign(i_nom_hat(1))*di_max ]; % Eq. (2.61)
+    
+    % ===================================================================
+    % 2)   Corrections still required & pulse longitudes
+    % ===================================================================
+    de_req = de_man_hat - de_hat;          % δe that must be fixed
+    di_req = di_man_hat - di_hat;          % δi that must be fixed
+    
+    u1 = wrapTo2Pi(atan2(de_req(2), de_req(1)));   % first tangential
+    u2 = mod(u1 + pi, 2*pi);                       % second tangential
+    un = wrapTo2Pi(atan2(di_req(2), di_req(1)));   % cross-track
+    
+    %% 3) Choose the maintenance-cycle length  Δt  [s]
+    %    (time from this 3-burn set to the *next* one)
+    Delta_t = 2*T_half;          % ← 1 full orbit; tune to your mission
+    
+    %% 3-a)  secular J2 + drag contributions to δu  (Eq. 2.69)
+    du_J2 = -12*gamma*sin(2*i_TSX_init)*di_hat(1)*n*Delta_t;   % J2 term
+    du_D  = 0;                                                 % drag term
+                                                    %  (set to 0 if neglected)
+    
+    %% 3-b)  build the bracket of Eq. (2.71)
+    delta_u      = roe_hat(2);          % current along-track error  ̂δu
+    delta_u_nom  = 0;                   % centre of the window (your target)
+    
+    bracket =  3*de_max                     ...   % 3 δe_max
+            +  da_hat                       ...   % + δa
+            - (4/(3*pi)) * ( delta_u - delta_u_nom ...
+                             + du_J2 + du_D );     % – 4/3π(…).
+    
+    %% 3-c)  δa^{man} from Eq. (2.71)
+    den     = 2*n*Delta_t - pi;          % denominator  2 n Δt − π
+    da_man  = -pi/den * bracket;         % ***dimension-less***
+    
+    %% 4)  Δv magnitudes (Eqs. 2.63–2.64) with the *dimension-less* variables
+    dvt1 = (n*a_chief/4) * ( (da_man - da_hat) + norm(de_req) );
+    dvt2 = (n*a_chief/4) * ( (da_man - da_hat) - norm(de_req) );
+    dvn  =  n*a_chief     *   norm(di_req);
+    
+    % ===================================================================
+    % 5)   Trigger once per cycle (unchanged)
+    % ===================================================================
+    sep = rad2deg(acos(dot(de_hat, di_hat)/(norm(de_hat)*norm(di_hat))));
+    sep = min(sep, 180 - sep);
+    
+    if sep > angle_thresh_deg && isempty(maneuver_log)
         
+        maneuver_log = struct( ...
+            'idx',   idx,        't_det', t_grid(idx), ...
+            'dvt1',  dvt1,       'dvt2',  dvt2,        ...
+            'dvn',   dvn,        'u1',    u1,          ...
+            'u2',    u2,         'un',    un,          ...
+            'u_c',   u_c                         );
+        
+        fprintf('[%6.2f orbits] trigger at idx=%d\n', t_grid(idx)/T, idx);
+        fprintf('  Δv_T1 = %.4f m/s @ u1 = %.2f rad\n', dvt1, u1);
+        fprintf('  Δv_T2 = %.4f m/s @ u2 = %.2f rad\n', dvt2, u2);
+        fprintf('  Δv_N  = %.4f m/s @ un = %.2f rad (sep = %.2f°)\n\n', ...
+                dvn, un, sep);
     end
 end
 
-% === APPLY TWO-PULSE MANEUVER WITH PHASING ===
+%% === 2) APPLY ALL THREE MANEUVERS ===
 if ~isempty(maneuver_log)
-    det   = maneuver_log(1);
-    t_det = det.t;        % detection time
-    u1    = det.u1;       % desired arg. of latitude for 1st burn
-    u2    = det.u2;       % desired arg. of latitude for 2nd burn
-    u_c   = det.u_c;      % chief's arg. of latitude at detection
+    det = maneuver_log;
 
-    % mean motion
-    n      = sqrt(mu / a_TSX_init^3);
-    T      = 2*pi / n;
+    % 1) First along‑track burn at u1
+    t1       = det.t_det + wrapTo2Pi(det.u1 - det.u_c)/n;
+    [~, i1]  = min(abs(t_grid - t1));
+    oe1_m    = TDX_oe(i1,:);  nu1 = mean2true(oe1_m(6),oe1_m(2),tol);
+    oe1_t    = [oe1_m(1:5), nu1];
+    rv1      = oe2rv(oe1_t,mu);
+    R1       = rv1(1:3)/norm(rv1(1:3));
+    N1       = cross(rv1(1:3),rv1(4:6)); N1=N1/norm(N1);
+    T1       = cross(N1,R1);
+    dv1_vec  = det.dvt1 * T1;
+    v1_new   = rv1(4:6) + dv1_vec;
+    oe1_f    = rv2oe([rv1(1:3);v1_new], mu);
+    M1_f     = true2mean(oe1_f(6),oe1_f(2));
+    oe1_new  = [oe1_f(1:5), M1_f];
 
-    % ——— First Burn: wait Δu1 then fire ———
-    du1     = wrapTo2Pi(u1 - u_c);        % phase offset rad
-    t_burn1 = t_det + du1 / n;            % when chief reaches u1
-    [~, idx1] = min(abs(t_grid - t_burn1));
+    % 2) Half‑orbit propagate to second T‐burn
+    t2     = t1 + T_half;
+    [~, i2s] = min(abs(t_grid - t1));
+    [~, i2e] = min(abs(t_grid - t2));
+    dt_fine  = (t2 - t1)/(i2e-i2s+1);
+    [~, oe_mid] = ode4(@compute_rates_GVE_J2, [t1 t2]', oe1_new', dt_fine);
 
-    % pull the deputy's mean OE at that moment
-    oe1_mean = TDX_oe(idx1, :);           % [a,e,i,Ω,ω,M_mean]
-    % convert M→ν for true OE
-    nu1      = mean2true(oe1_mean(6), oe1_mean(2), tol);
-    oe1_true = [oe1_mean(1:5), nu1];
+    % 3) Second along‑track burn at u2
+    oe2_m   = oe_mid(end,:); nu2 = mean2true(oe2_m(6),oe2_m(2),tol);
+    oe2_t   = [oe2_m(1:5), nu2];
+    rv2     = oe2rv(oe2_t, mu);
+    R2      = rv2(1:3)/norm(rv2(1:3));
+    N2      = cross(rv2(1:3),rv2(4:6)); N2=N2/norm(N2);
+    T2      = cross(N2,R2);
+    dv2_vec = det.dvt2 * T2;
+    v2_new  = rv2(4:6) + dv2_vec;
+    oe2_f   = rv2oe([rv2(1:3);v2_new], mu);
+    M2_f    = true2mean(oe2_f(6),oe2_f(2));
+    oe2_new = [oe2_f(1:5), M2_f];
 
-    % ECI state, RTN basis, and burn
-    rv1      = oe2rv(oe1_true, mu);
-    r1       = rv1(1:3);  v1 = rv1(4:6);
-    h1       = cross(r1,v1);
-    R_hat    = r1/norm(r1);
-    N_hat    = h1/norm(h1);
-    T_hat    = cross(N_hat,R_hat);
-    dv1_vec  = det.dvt1 * T_hat;
-    v1_new   = v1 + dv1_vec;
+    % 4) Cross‑track burn at un
+    t3     = det.t_det + wrapTo2Pi(det.un - det.u_c)/n;
+    [~, i3] = min(abs(t_grid - t3));
+    oe3_m   = TDX_oe(i3,:); nu3 = mean2true(oe3_m(6),oe3_m(2),tol);
+    oe3_t   = [oe3_m(1:5), nu3];
+    rv3     = oe2rv(oe3_t,mu);
+    N3      = cross(rv3(1:3),rv3(4:6)); N3=N3/norm(N3);
+    v3_new  = rv3(4:6) + det.dvn * N3;
+    oe3_f   = rv2oe([rv3(1:3);v3_new], mu);
+    M3_f    = true2mean(oe3_f(6),oe3_f(2));
+    oe3_new = [oe3_f(1:5), M3_f];
 
-    % back to mean OE
-    X1        = [r1; v1_new];
-    oe1_full  = rv2oe(X1, mu);            % [a,e,i,Ω,ω,ν]
-    M1_new    = true2mean(oe1_full(6), oe1_full(2));
-    oe1_new   = [oe1_full(1:5), M1_new];
+    % 5) Final propagate
+    [~, oe_end] = ode4(@compute_rates_GVE_J2, [t3 tend]', oe3_new', dt);
 
-    % ——— Second Burn: phase to u2 ———
-    % find chief OE at idx1 for new u_c1
-    oe_c1     = TSX_oe(idx1,:);
-    nu_c1     = mean2true(oe_c1(6), oe_c1(2), tol);
-    u_c1      = wrapTo2Pi(nu_c1 + oe_c1(5));
-    du2       = wrapTo2Pi(u2 - u_c1);
-    t_burn2   = t_grid(idx1) + du2 / n;
-    [~, idx2] = min(abs(t_grid - t_burn2));
-
-    % propagate deputy from oe1_new to just before second burn
-    tspan2    = [t_grid(idx1), t_grid(idx2)];
-    y0        = oe1_new(:).';
-    dt_fine   = (tspan2(2)-tspan2(1)) / round((tspan2(2)-tspan2(1))/dt);
-    [~, oe_between] = ode4(@compute_rates_GVE_J2, tspan2, y0', dt_fine);
-
-    % pull deputy OE right at idx2
-    oe2_mean = oe_between(end,:);
-    nu2      = mean2true(oe2_mean(6), oe2_mean(2), tol);
-    oe2_true = [oe2_mean(1:5), nu2];
-
-    % second impulse in RTN
-    rv2      = oe2rv(oe2_true, mu);
-    r2       = rv2(1:3);  v2 = rv2(4:6);
-    h2       = cross(r2,v2);
-    R_hat2   = r2/norm(r2);
-    N_hat2   = h2/norm(h2);
-    T_hat2   = cross(N_hat2,R_hat2);
-    dv2_vec  = det.dvt2 * T_hat2;
-    v2_new   = v2 + dv2_vec;
-
-    % back to mean OE
-    X2        = [r2; v2_new];
-    oe2_full  = rv2oe(X2, mu);
-    M2_new    = true2mean(oe2_full(6), oe2_full(2));
-    oe2_new   = [oe2_full(1:5), M2_new];
-
-    % ——— Final Propagation to End ———
-    [~, oe_after] = ode4(@compute_rates_GVE_J2, [t_grid(idx2), tend], oe2_new', dt);
-
-    % stitch your full TDX_oe
-    TDX_oe = [ TDX_oe(1:idx1-1,:)
+    % 6) Stitch TDX back
+    TDX_oe = [ TDX_oe(1:i1-1,:)
                oe1_new
-               oe_between(2:end,:)
+               oe_mid(2:end,:)
                oe2_new
-               oe_after(2:end,:) ];
+               TDX_oe(i2e+1:i3-1,:)
+               oe3_new
+               oe_end(2:end,:) ];
 
-    % report
-    fprintf('First burn at u1=%.2f rad (t=%.1f s), idx1=%d\n', u1, t_burn1, idx1);
-    fprintf('Second burn at u2=%.2f rad (t=%.1f s), idx2=%d\n', u2, t_burn2, idx2);
-    total_dv = norm(dv1_vec)+norm(dv2_vec);
-    fprintf('>>> Total Δv applied: %.6f m/s\n\n', total_dv);
-    rel_post = TSX_oe(idx2,1) * compute_roes( ...
-                TSX_oe(idx2,:), ...
-                TDX_oe(idx2,:) )';
-
-    % split out e‑ and i‑vectors
-    delta_e = rel_post(3:4);
-    delta_i = rel_post(5:6);
-
-    % magnitudes
-    norm_e = norm(delta_e);
-    norm_i = norm(delta_i);
-
-    % e/i separation angle
-    cos_sep    = dot(delta_e, delta_i) / (norm_e * norm_i);
-    sep_deg_post = rad2deg(acos( max(min(cos_sep,1),-1) ));
-
-    fprintf('\nPost‑burn summary (at idx2=%d):\n', idx2);
-    fprintf('   ||δe|| = %8.2f m   (target %8.2f m)\n', norm_e, norm(roe_target(3:4)));
-    fprintf('   ||δi|| = %8.2f m   (target %8.2f m)\n', norm_i, norm(roe_target(5:6)));
-    fprintf('   e/i separation = %6.2f°   (target 180°)\n\n', sep_deg_post);
-end 
-
-
-function x = clip01(x)
-%CLIP01  Clamp numbers into the open interval (0,1)
-x = max(0, min(1 - 1e-12, x));   % keeps them real and < 1
+    % 7) Print final ROE & e/i sep:
+    rel_fin = TSX_oe(i3,1)*compute_roes(TSX_oe(i3,:),TDX_oe(i3,:))';
+    de  = norm(rel_fin(3:4)); di = norm(rel_fin(5:6));
+    sep = rad2deg(acos(dot(rel_fin(3:4),rel_fin(5:6))/(de*di)));
+    fprintf('\n=== Post‑burn @ idx=%d ===\n', i3);
+    fprintf(' Δv_T1=%.4f, Δv_T2=%.4f, Δv_N=%.4f m/s\n',det.dvt1,det.dvt2,det.dvn);
+    fprintf(' ROE=[%6.2f %6.2f %6.2f %6.2f %6.2f %6.2f]\n', rel_fin);
+    fprintf(' ||δe||=%6.2f m, ||δi||=%6.2f m, sep=%6.2f°\n\n',de,di,sep);
 end
