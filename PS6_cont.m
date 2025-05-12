@@ -56,6 +56,7 @@ u_max = 1e-4;     % maximum thrust accel (m/s^2)
 
 % 5) Integrate reduced-state ODE
 delta0 = delta_nom;   % start at nominal
+delta0 = [0; 0; 400; 0; 500; 0]; %for reconfiguration
 odefun = @(t,delta) reduced_dynamics(delta, oe_c, delta_nom, k, N_ip, N_oop, u_max);
 [~, hist_delta] = ode4(odefun, [0 t_end], delta0, dt);
 
@@ -76,7 +77,10 @@ for idx = 1:num_pts
     Delta     = delta_i - delta_nom;
     phi_ip    = atan2(delta_i(4), delta_i(3));
     phi_oop   = atan2(delta_i(6), delta_i(5));
-    P         = (1/k)*diag([cos(phi_ip)^N_ip; cos(phi_ip)^N_ip; cos(phi_ip)^N_ip; cos(phi_oop)^N_oop; cos(phi_oop)^N_oop; 1]);
+    phi = oe_c(5) + mean2true(oe_c(6), oe_c(2));
+    Jp = phi - phi_ip;
+    Hp = phi - phi_oop;
+    P         = (1/k)*diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop; 1]);
     u_i       = - pinv(B_c)*(A_c*delta_i + P*Delta);
     u_i       = max(min(u_i, u_max), -u_max);
     u_hist(:,idx) = u_i;
@@ -95,15 +99,22 @@ xlabel('Orbit Number'); ylabel('Cumulative Delta-v (m/s)');
 title('Cumulative Delta-v');
 
 % 8) Plot ROE error norm
-err_norm = sqrt(sum(hist_delta(:,1:5).^2,2));
 figure;
-plot(orbit_number, err_norm);
-xlabel('Orbit Number'); ylabel('||delta ROE||');
-title('Relative Orbital Error Norm');
+element_labels = {'a\delta a [m]', 'a\deltae_x [m]', 'a\deltae_y [m]', 'a\deltai_x [m]', 'a\deltai_y [m]'};
+
+for i = 1:5
+    subplot(3,2,i);
+    plot(orbit_number, hist_delta(:,i) - rel_nom(i));
+    xlabel('Orbit Number');
+    ylabel(element_labels{i});
+    title(['ROE Error: ' element_labels{i}]);
+    grid on;
+end
+
 
 %% standalone ODE function
 function delta_dot = reduced_dynamics(delta, oe_c, delta_nom, k, N_ip, N_oop, u_max)
-    % delta = [delta_a; delta_ex; delta_ey; delta_ix; delta_iy; delta_a_dot]
+    %delta = [delta_a; delta_ex; delta_ey; delta_ix; delta_iy; delta_a_dot];
     % 1) reduced plant & input
     [A_c, B_c] = plant_reduced_qns(oe_c);
     % 2) tracking error
@@ -111,11 +122,14 @@ function delta_dot = reduced_dynamics(delta, oe_c, delta_nom, k, N_ip, N_oop, u_
     % 3) Lyapunov P
     phi_ip  = atan2(delta(4), delta(3));
     phi_oop = atan2(delta(6), delta(5));
-    P       = (1/k)*diag([cos(phi_ip)^N_ip; cos(phi_ip)^N_ip; cos(phi_ip)^N_ip; cos(phi_oop)^N_oop; cos(phi_oop)^N_oop; 1]);
+    phi = oe_c(5) + mean2true(oe_c(6), oe_c(2));
+    Jp = phi - phi_ip;
+    Hp = phi - phi_oop;
+    P       = (1/k)*diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop; 1]);
     % 4) control
     u = - pinv(B_c)*(A_c*delta + P*Delta);
     % 5) saturation
-    %u = max(min(u, u_max), -u_max);
+    u = max(min(u, u_max), -u_max);
     % 6) ODE
     delta_dot = A_c*delta + B_c*u;
 end
