@@ -24,8 +24,7 @@ switch scenario
   otherwise
     error('Invalid scenario');
 end
-fprintf('Running "%s" with nominal ROE = [%g %g %g %g %g]\n', ...
-        scenario_name, rel_nom);
+fprintf('Running "%s" with nominal ROE = [%g %g %g %g %g]\n', scenario_name, rel_nom);
 
 % append zero for delta_a_dot
 delta_nom = [rel_nom; 0];
@@ -37,7 +36,7 @@ i0     = deg2rad(97.4453);
 RAAN0  = deg2rad(351.0108);
 omega0 = deg2rad(101.2452);
 M0     = deg2rad(11.6520);
-oe_c   = [a0; e0; i0; RAAN0; omega0; M0];
+oe_c0  = [a0; e0; i0; RAAN0; omega0; M0];
 
 % 3) Time grid
 n0       = sqrt(mu/a0^3);
@@ -54,82 +53,124 @@ N_ip  = 14;       % in-plane exponent
 N_oop = 14;       % out-of-plane exponent
 u_max = 1e-4;     % maximum thrust accel (m/s^2)
 
-% 5) Integrate reduced-state ODE
-delta0 = delta_nom;   % start at nominal
-delta0 = [0; 0; 400; 0; 500; 0]; %for reconfiguration
-odefun = @(t,delta) reduced_dynamics(delta, oe_c, delta_nom, k, N_ip, N_oop, u_max);
-[~, hist_delta] = ode4(odefun, [0 t_end], delta0, dt);
+% 5) Integrate augmented ODE (ROE-error + OE)
+delta0 = [0; 0; 400; 0; 500; 0];
+x0 = [delta0; oe_c0];
+odefun = @(t,x) augmented_dynamics(t, x, delta_nom, k, N_ip, N_oop, u_max);
+[~, hist_x] = ode4(odefun, [0 t_end], x0, dt);
 
-% 6) Plot state trajectories
+% split histories
+hist_delta = hist_x(:,1:6);
+hist_oe    = hist_x(:,7:12);
+
+% 6) Plot individual ROE error components vs orbit
 orbit_number = t_grid / Torbit;
 figure;
-plot(orbit_number, hist_delta(:,1:5));
-xlabel('Orbit Number'); ylabel('ROE Components');
-legend('delta_a','delta_ex','delta_ey','delta_ix','delta_iy','Location','best');
-title('Reduced ROE vs Orbits');
+components = {'delta_a','delta_ex','delta_ey','delta_ix','delta_iy','delta_a_dot'};
+for j = 1:6
+    subplot(3,2,j);
+    plot(orbit_number, hist_delta(:,j));
+    xlabel('Orbit Number'); ylabel(components{j});
+    title(components{j});
+end
+sgtitle('Reduced ROE Error Components vs Orbits');
 
-% 7) Compute and plot delta-v history
-u_hist  = zeros(2, num_pts);
-dv_hist = zeros(num_pts,1);
+% 7) Compute control acceleration history & record phi
+u_hist   = zeros(2, num_pts);
+phi_hist = zeros(num_pts, 1);
+a_hist   = zeros(num_pts,1);
+dv_hist  = zeros(num_pts,1);
+dir_hist = zeros(num_pts,1);
 for idx = 1:num_pts
     delta_i = hist_delta(idx,:)';
-    [A_c, B_c] = plant_reduced_qns(oe_c);
-    Delta     = delta_i - delta_nom;
-    phi_ip    = atan2(delta_i(4), delta_i(3));
-    phi_oop   = atan2(delta_i(6), delta_i(5));
-    phi = oe_c(5) + mean2true(oe_c(6), oe_c(2));
-    Jp = phi - phi_ip;
-    Hp = phi - phi_oop;
-    P         = (1/k)*diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop; 1]);
-    u_i       = - pinv(B_c)*(A_c*delta_i + P*Delta);
-    u_i       = max(min(u_i, u_max), -u_max);
-    u_hist(:,idx) = u_i;
-    dv_hist(idx)   = norm(u_i)*dt;
+    oe_i    = hist_oe(idx,:)';
+
+    % plant and gain shaping at this OE
+    [A_c, B_c] = plant_reduced_qns(oe_i);
+    A5 = A_c(1:5,1:5);
+    B5 = B_c(1:5,:);
+
+    % tracking error
+    Delta5 = delta_i(1:5) - rel_nom;
+
+    % phases
+    phi_ip   = atan2(delta_i(3), delta_i(2));
+    phi_oop  = atan2(delta_i(5), delta_i(4));
+    phi_loc  = oe_i(5) + mean2true(oe_i(6), oe_i(2), tol);
+
+    % P5
+    Jp = phi_loc - phi_ip;
+    Hp = phi_loc - phi_oop;
+    P5 = (1/k) * diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop]);
+
+    % control
+    u = - pinv(B5) * (A5*delta_i(1:5) + P5*Delta5);
+
+    % record
+    u_hist(:,idx)  = u;
+    phi_hist(idx)  = phi_loc;
+    a_hist(idx)    = norm(u);
+    dv_hist(idx)   = a_hist(idx)*dt;
+    dir_hist(idx)  = atan2(u(2), u(1));
 end
 cum_dv = cumsum(dv_hist);
 
+% 8) Plot control acceleration level
 figure;
-plot(orbit_number, dv_hist);
-xlabel('Orbit Number'); ylabel('Delta-v per step (m/s)');
-title('Delta-v per Step');
+plot(orbit_number, a_hist);
+xlabel('Orbit Number'); ylabel('Acceleration magnitude (m/s^2)');
+title('Control Acceleration Level');
 
+figure;
+plot(phi_hist, u_hist');
+xlabel('Argument of Latitude (rad)'); ylabel('Acceleration (m/s^2)');
+title('Control vs Argument of Latitude');
+
+% thrust direction
+figure;
+plot(orbit_number, dir_hist);
+xlabel('Orbit Number'); ylabel('Thrust Direction (rad)');
+title('Thrust Direction Angle');
+
+% cumulative delta-v
 figure;
 plot(orbit_number, cum_dv);
 xlabel('Orbit Number'); ylabel('Cumulative Delta-v (m/s)');
 title('Cumulative Delta-v');
 
-% 8) Plot ROE error norm
-figure;
-element_labels = {'a\delta a [m]', 'a\deltae_x [m]', 'a\deltae_y [m]', 'a\deltai_x [m]', 'a\deltai_y [m]'};
+%% augmented_dynamics.m
+function x_dot = augmented_dynamics(t, x, delta_nom, k, N_ip, N_oop, u_max)
+    global tol;
+    % x = [delta(6×1); oe(6×1)]
+    delta = x(1:6);
+    oe    = x(7:12);
 
-for i = 1:5
-    subplot(3,2,i);
-    plot(orbit_number, hist_delta(:,i) - rel_nom(i));
-    xlabel('Orbit Number');
-    ylabel(element_labels{i});
-    title(['ROE Error: ' element_labels{i}]);
-    grid on;
-end
+    % 1) propagate OE under J2
+    oe_dot = compute_rates_GVE_J2(t, oe);
 
+    % 2) build plant
+    [A_c, B_c] = plant_reduced_qns(oe);
 
-%% standalone ODE function
-function delta_dot = reduced_dynamics(delta, oe_c, delta_nom, k, N_ip, N_oop, u_max)
-    %delta = [delta_a; delta_ex; delta_ey; delta_ix; delta_iy; delta_a_dot];
-    % 1) reduced plant & input
-    [A_c, B_c] = plant_reduced_qns(oe_c);
-    % 2) tracking error
-    Delta = delta - delta_nom;
-    % 3) Lyapunov P
-    phi_ip  = atan2(delta(4), delta(3));
-    phi_oop = atan2(delta(6), delta(5));
-    phi = oe_c(5) + mean2true(oe_c(6), oe_c(2));
-    Jp = phi - phi_ip;
-    Hp = phi - phi_oop;
-    P       = (1/k)*diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop; 1]);
-    % 4) control
-    u = - pinv(B_c)*(A_c*delta + P*Delta);
-    % 5) saturation
-    u = max(min(u, u_max), -u_max);
-    % 6) ODE
+    % 3) Lyapunov shaping
+    delta5   = delta(1:5);
+    Delta5   = delta5 - delta_nom(1:5);
+    phi_ip   = atan2(delta5(3), delta5(2));
+    phi_oop  = atan2(delta5(5), delta5(4));
+    phi_full = oe(5) + mean2true(oe(6), oe(2), tol);
+
+    Jp = phi_full - phi_ip;
+    Hp = phi_full - phi_oop;
+    P5 = (1/k) * diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop]);
+
+    % 4) compute control
+    A5 = A_c(1:5,1:5);
+    B5 = B_c(1:5,:);
+    u  = - pinv(B5) * (A5*delta5 + P5*Delta5);
+    % optional: saturate u here
+
+    % 5) propagate delta under thrust
     delta_dot = A_c*delta + B_c*u;
+
+    % pack
+    x_dot = [delta_dot; oe_dot];
 end
