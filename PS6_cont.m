@@ -43,7 +43,7 @@ n0       = sqrt(mu/a0^3);
 Torbit   = 2*pi/n0;
 n_orbit  = 15;
 t_end    = n_orbit * Torbit;
-num_pts  = 1000;
+num_pts  = 10000;
 t_grid   = linspace(0, t_end, num_pts)';
 dt       = t_grid(2) - t_grid(1);
 
@@ -96,7 +96,7 @@ for idx = 1:num_pts
     % phases
     phi_ip   = atan2(delta_i(3), delta_i(2));
     phi_oop  = atan2(delta_i(5), delta_i(4));
-    phi_loc  = oe_i(5) + mean2true(oe_i(6), oe_i(2), tol);
+    phi_loc  = wrapTo2Pi(oe_i(5) + mean2true(oe_i(6), oe_i(2), tol));
 
     % P5
     Jp = phi_loc - phi_ip;

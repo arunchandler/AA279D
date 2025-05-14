@@ -21,17 +21,17 @@ scenario = input( ...
 switch scenario
     case 1
         % M-D2
-        rel_qns_init = [0, 1, 0, 300, 0, 400];
+        rel_qns_init = [0, 0, 0, 300, 0, 400];
         scenario_name = 'M-C';
         
     case 2
         % M-D3
-        rel_qns_init = [0, 1, 0, 300, 0, 500];  
+        rel_qns_init = [0, 0, 0, 300, 0, 500];  
         scenario_name = 'M-D1';
         
     case 3
         % M-D4
-        rel_qns_init = [0, 1, 0, 500, 0, 300];  
+        rel_qns_init = [0, 0, 0, 500, 0, 300];  
         scenario_name = 'M-E';
         
     otherwise
@@ -282,7 +282,7 @@ TDX_oe_2 = zeros(num_points, 6);
 TDX_oe_2(1,:) = TDX_init_oe_2;
 
 rel_oe_2 = zeros(num_points, 6);
-rel_oe_2(1,:) = compute_roes(TSX_init_oe, TDX_init_oe_2);
+rel_oe_2(1,:) = a_TSX_init*compute_roes(TSX_init_oe, TDX_init_oe_2);
 
 state_cur = rel_state_init;
 
@@ -454,11 +454,11 @@ figure;
 tiledlayout(3,2,'TileSpacing','compact','Padding','compact');
 
 labels = {'a\delta a [m]', ...
-          'a\delta\lambda [rad]', ...
-          'a\delta e_x', ...
-          'a\delta e_y', ...
-          'a\delta i_x', ...
-          'a\delta i_y'};
+          'a\delta\lambda [m]', ...
+          'a\delta e_x [m]', ...
+          'a\delta e_y [m]', ...
+          'a\delta i_x [m]', ...
+          'a\delta i_y [m]'};
 
 for k = 1:6
     nexttile;
