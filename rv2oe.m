@@ -15,7 +15,7 @@ function params = rv2oe(X, mu)
     h_norm = norm(h);
 
     % Inclination
-    i = acos(h(3) / h_norm);
+    i = wrapTo2Pi(acos(h(3) / h_norm));
 
     % Node vector
     K = [0; 0; 1];
@@ -24,9 +24,9 @@ function params = rv2oe(X, mu)
 
     % Right Ascension of the Ascending Node (RAAN)
     if N_norm ~= 0
-        RAAN = acos(N(1) / N_norm);
+        RAAN = wrapTo2Pi(acos(N(1) / N_norm));
         if N(2) < 0
-            RAAN = 2*pi - RAAN;
+            RAAN = wrapTo2Pi(2*pi - RAAN);
         end
     else
         RAAN = 0;
@@ -38,18 +38,18 @@ function params = rv2oe(X, mu)
 
     % Argument of Periapsis (omega)
     if N_norm ~= 0
-        omega = acos(dot(N, e_vec) / (N_norm * e));
+        omega = wrapTo2Pi(acos(dot(N, e_vec) / (N_norm * e)));
         if e_vec(3) < 0
-            omega = 2*pi - omega;
+            omega = wrapTo2Pi(2*pi - omega);
         end
     else
         omega = 0;
     end
 
     % True Anomaly (nu)
-    nu = acos(dot(e_vec, r) / (e * r_norm));
+    nu = wrapTo2Pi(acos(dot(e_vec, r) / (e * r_norm)));
     if dot(r, v) < 0
-        nu = 2*pi - nu;
+        nu = wrapTo2Pi(2*pi - nu);
     end
 
     % Semi-major axis (a)

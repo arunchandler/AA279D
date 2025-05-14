@@ -22,21 +22,19 @@ u_TSX_init    = M_TSX_init + omega_TSX_init;
 scenario = input( ...
     ['Select reconfiguration scenario:\n' ...
      '  1: Test Reconfiguration\n' ...
-     '  2: Test Keeping\n' ...
+     '  2: M-D2 to M-D3\n' ...
      'Your choice: '] );
 
 switch scenario
     case 1
-        % M-D2 to M-D3
         rel_qns_pre = [0, 0, 200, 200, 200, 200];
         rel_qns_post  = [0, 0, 100, 100, 100, 100];
         scenario_name = 'Test Recongifuration';
         
     case 2
-        % M-D3 to M-D4
-        rel_qns_pre = [0, 0, 200, 200, 200, 200];
-        rel_qns_post  = [0, 0, 200, 200, 200, 200];
-        scenario_name = 'Test Keeping';
+        rel_qns_pre = [0, 0, 0, 300, 0, 400];
+        rel_qns_post  = [0, 0, 0, 300, 0, 500];
+        scenario_name = 'M-D2 to M-D3';
         
     otherwise
         error('Invalid scenario');
@@ -46,6 +44,7 @@ fprintf('Running scenario "%s": rel_qns_init = [%g %g %g %g %g %g]\n rel_qns_fin
         scenario_name, [rel_qns_pre, rel_qns_post]);
 
 delta_nom = [rel_qns_post(1), rel_qns_post(3:6), 0]./a_TSX_init;
+da_nom = rel_qns_post(1);
 dlambda_nom  = rel_qns_post(2);
 
 TSX_init_oe = [a_TSX_init, e_TSX_init, i_TSX_init, ...
@@ -71,9 +70,9 @@ orbit_num = floor(t_orbit) + 1;
 
 %Lyapunov parameters and thrust limit
 k     = 1e3;      % Lyapunov scaling
-N_ip  = 14;       % in-plane exponent
-N_oop = 14;       % out-of-plane exponent
-u_max = 1e-2;     % maximum thrust accel (m/s^2)
+N_ip  = 4;       % in-plane exponent
+N_oop = 4;       % out-of-plane exponent
+u_max = 1e-4;     % maximum thrust accel (m/s^2)
 
 %propagation with delta Vs
 state_out = zeros(num_points, 12);
@@ -107,8 +106,9 @@ for idx = 2:num_points
     t_next = t_grid(idx);
 
     %delta V computations
-    a = TSX_oe_cur(1);
-    delta_cur = [rel_oe_cur(1), rel_oe_cur(3:6), 0]./a;
+    a_cur = TSX_oe_cur(1);
+    n_cur = sqrt(mu/a_cur^3);
+    delta_cur = [rel_oe_cur(1), rel_oe_cur(3:6), 0]./a_cur;
 
     [A_c, B_c] = plant_reduced_qns(TSX_oe_cur);
     A5 = A_c(1:5,1:5);
@@ -124,24 +124,24 @@ for idx = 2:num_points
     P5 = (1/k) * diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop]);
 
     %dv for Delta da for dlambda_dot
-    % dlambda    = rel_oe_cur(2);
-    % Ddlambda = dlambda - dlambda_nom;
-    % 
-    % da_des      = abs(Dda_tan)/2;
-    % dlambda_des = 1.5 * n * da_des;           
-    % tau              = 500;                            
-    % dlambda_ref = sign(Ddlambda) * min(abs(Ddlambda)/tau, dlambda_des);
-    % 
-    % da_ref = - (2/3) * dlambda_ref / n;
-    % 
+    % e_cur = TSX_oe_cur(2);
+    % f_cur = mean2true(TSX_oe_cur(6), e_cur, tol);
     % da_cur = rel_oe_cur(1);
-    % da_err = da_ref - da_cur;
-    % u_t = da_err / dt;
-    % u_t = max( min(u_t, u_max), -u_max );
-
+    % dlambda_cur = rel_oe_cur(2);
+    % dlambda_dot_cur = -3/2*n_cur*da_cur;
+    % 
+    % Ddlambda = dlambda_cur - dlambda_nom;
+    % tau = 1000000;
+    % dlambda_dot_des = - Ddlambda/tau;
+    % 
+    % Dda_tan = -2/3* dlambda_dot_des / n_cur;
+    % 
+    % dvt = Dda_tan * n_cur / (2 * (1+e_cur*cos(f_cur)));
+    % u_dvt = dvt / dt;
 
     % control
     u = [0.0; -pinv(B5) * (A5*delta_cur(1:5)' + P5*Delta5')]; % no r dv
+    % u(2) = u(2) + u_dvt;
     dv = u .* dt;
     un = norm(u);
 
@@ -226,19 +226,19 @@ axis equal;
 figure;
 % Δa
 subplot(3,2,1);
-plot(orbit_num, rel_oe(:,1));
+plot(orbit_num, rel_oe(:,1), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\deltaa [m]');
 grid on;
 % Δ\lambda
 subplot(3,2,2);
-plot(orbit_num, rel_oe(:,2));
+plot(orbit_num, rel_oe(:,2), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\delta\lambda [m]');
 grid on;
 % Δe_x
 subplot(3,2,3);
-plot(orbit_num, rel_oe(:,3));
+plot(orbit_num, rel_oe(:,3), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\deltae_x [m]');
 grid on;
