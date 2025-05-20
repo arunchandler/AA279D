@@ -9,7 +9,7 @@
 
 function E = true2ecc(f, e)
 
-f = mod(f, 2*pi);
+f = wrapTo2Pi(f);
 
 E = 2*atan(sqrt((1-e)/(1+e)) * tan(f/2));
 

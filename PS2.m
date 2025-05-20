@@ -54,7 +54,7 @@ r0_init = init_TSX_rv_ECI;
 
 init_state = [init_TDX_rv_RTN; r0_init];
 
-[t_out, TDX_rv_out_unperturbed_nonlin] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, tend]', init_state, tint);
+[t_out, TDX_rv_out_unperturbed_nonlin] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [tstart, tend]', init_state, tint);
 
 figure;
 %sgtitle('Relative Position & Velocity');
@@ -311,7 +311,7 @@ r0_init_d = init_TSX_rv_ECI_d;
 
 init_state_d = [init_TDX_rv_RTN_d; r0_init_d];
 % relative propagation
-[t_out, TDX_rv_out_unperturbed_nonlin_d] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, tend]', init_state_d, tint);
+[t_out, TDX_rv_out_unperturbed_nonlin_d] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [tstart, tend]', init_state_d, tint);
 
 %fundamental eq propagation
 
@@ -398,7 +398,7 @@ t_m_new = t_perigee + n_orbits * T;
 fprintf('Chosen perigee time: %g seconds\n', t_perigee);
 fprintf('New maneuver time (after %d orbits): %g seconds\n', n_orbits, t_m_new);
 
-[t_out_pre, state_out_pre] = ode4(@compute_rates_rv_rel_unperturbed, [tstart, t_m_new]', init_state_d, tint);
+[t_out_pre, state_out_pre] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [tstart, t_m_new]', init_state_d, tint);
 t_out_pre = t_out_pre(:);
 state_at_tm = state_out_pre(end, :)';
 
@@ -407,7 +407,7 @@ impulse_vector = [0; d_v; 0];
 state_at_tm(4:6) = state_at_tm(4:6) + impulse_vector;
 
 
-[t_out_post, state_out_post] = ode4(@compute_rates_rv_rel_unperturbed, [t_m_new, tend]', state_at_tm, tint);
+[t_out_post, state_out_post] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [t_m_new, tend]', state_at_tm, tint);
 t_out_post = t_out_post(:);
 
 
