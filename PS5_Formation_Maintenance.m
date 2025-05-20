@@ -180,7 +180,7 @@ subplot(1,3,3); plot(guidata(:,2), guidata(:,3)); axis equal; grid on;
 xlabel('r_T [m]'); ylabel('r_N [m]'); title('TN plane');
 
 % Relative OE vs orbit
-figure; subplot(3,2,1); plot(orbit_num, rel_oe_hist(:,1)); ylabel('a\deltaa [m]'); grid on;
+figure; subplot(3,2,1); plot(t_orbit, rel_oe_hist(:,1)); ylabel('a\deltaa [m]'); grid on;
 subplot(3,2,2); plot(t_orbit, rel_oe_hist(:,2)); ylabel('a\delta\lambda [m]'); grid on;
 subplot(3,2,3); plot(t_orbit, rel_oe_hist(:,3)); ylabel('a\deltae_x [m]'); grid on;
 subplot(3,2,4); plot(t_orbit, rel_oe_hist(:,4)); ylabel('a\deltae_y [m]'); grid on;
@@ -189,7 +189,7 @@ subplot(3,2,6); plot(t_orbit, rel_oe_hist(:,6)); ylabel('a\deltai_y [m]'); grid 
 
 % Cumulative Δv budget
 cum_dv = cumsum(sum(abs(dv_hist),1));
-figure; plot(orbit_num, cum_dv); grid on;
+figure; plot(t_orbit, cum_dv); grid on;
 xlabel('Orbit Number'); ylabel('Cumulative Δv [m/s]');
 total_dv = cum_dv(end);
 fprintf('Total Δv = %.3f m/s\n', total_dv);

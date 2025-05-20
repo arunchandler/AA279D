@@ -29,9 +29,12 @@ function roe = compute_roes(oe_ref, oe)
     M     = wrapTo2Pi(oe(6));
     u     = wrapTo2Pi(omega + M);
 
+    du   = mod(u - u_ref + pi, 2*pi) - pi;         % wraps into (-π,π]
+    dRAAN   = mod(RAAN - RAAN_ref + pi, 2*pi) - pi;
+
     % relative ROEs
     delta_a      = (a - a_ref) / a_ref;
-    delta_lambda = (u - u_ref) + (RAAN - RAAN_ref)*cos(i_ref);
+    delta_lambda = du + dRAAN*cos(i_ref);
     delta_ex     = e*cos(omega)     - e_ref*cos(omega_ref);
     delta_ey     = e*sin(omega)     - e_ref*sin(omega_ref);
     delta_ix     = i - i_ref;

@@ -23,6 +23,7 @@ scenario = input( ...
     ['Select reconfiguration scenario:\n' ...
      '  1: Test Reconfiguration\n' ...
      '  2: M-D2 to M-D3\n' ...
+     '  3: M-D3 to M-D4\n' ...
      'Your choice: '] );
 
 switch scenario
@@ -35,6 +36,12 @@ switch scenario
         rel_qns_pre = [0, 0, 0, 300, 0, 400];
         rel_qns_post  = [0, 0, 0, 300, 0, 500];
         scenario_name = 'M-D2 to M-D3';
+
+    case 3
+        % M-D3 to M-D4
+        rel_qns_pre = [0, 0, 0, 300, 0, 500];
+        rel_qns_post  = [0, 0, 0, 500, 0, 300];
+        scenario_name = 'M-D3 to M-D4';
         
     otherwise
         error('Invalid scenario');
@@ -176,14 +183,19 @@ for idx = 2:num_points
     state_out(idx,:) = state_next;
 
     TSX_params = rv2oe(TSX_ECI_next, mu);
-    TSX_oe_next = [TSX_params(1:5), true2mean(TSX_params(6), TSX_params(2))];
+    TSX_oe_next = osc2mean([TSX_params(1:5), true2mean(TSX_params(6), TSX_params(2))]);
+    TSX_oe_next(3:6) = wrapTo2Pi(TSX_oe_next(3:6));
     TSX_oe(idx,:) = TSX_oe_next;
 
     TDX_params = rv2oe(TDX_ECI_next, mu);
-    TDX_oe_next = [TDX_params(1:5), true2mean(TDX_params(6), TDX_params(2))];
+    TDX_oe_next = osc2mean([TDX_params(1:5), true2mean(TDX_params(6), TDX_params(2))]);
+    TDX_oe_next(3:6) = wrapTo2Pi(TDX_oe_next(3:6));
     TDX_oe(idx,:) = TDX_oe_next;
 
     rel_oe_next = TSX_oe_next(1)*compute_roes(TSX_oe_next, TDX_oe_next)';
+    % if (abs(rel_oe_next(2))>10^5)
+    %     rel_oe_next(2) = 0.0;
+    % end
     rel_oe(idx,:) = rel_oe_next;
 
     %update current states
@@ -237,37 +249,37 @@ axis equal;
 figure;
 % Δa
 subplot(3,2,1);
-plot(orbit_num, rel_oe(:,1), 'LineWidth', 1.5);
+plot(t_orbit, rel_oe(:,1), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\deltaa [m]');
 grid on;
 % Δ\lambda
 subplot(3,2,2);
-plot(orbit_num, rel_oe(:,2), 'LineWidth', 1.5);
+plot(t_orbit, rel_oe(:,2), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\delta\lambda [m]');
 grid on;
 % Δe_x
 subplot(3,2,3);
-plot(orbit_num, rel_oe(:,3), 'LineWidth', 1.5);
+plot(t_orbit, rel_oe(:,3), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\deltae_x [m]');
 grid on;
 % Δe_y
 subplot(3,2,4);
-plot(orbit_num, rel_oe(:,4), 'LineWidth', 1.5);
+plot(t_orbit, rel_oe(:,4), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\deltae_y [m]');
 grid on;
 % Δi_x
 subplot(3,2,5);
-plot(orbit_num, rel_oe(:,5), 'LineWidth', 1.5);
+plot(t_orbit, rel_oe(:,5), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\deltai_x [m]');
 grid on;
 % Δi_y
 subplot(3,2,6);
-plot(orbit_num, rel_oe(:,6), 'LineWidth', 1.5);
+plot(t_orbit, rel_oe(:,6), 'LineWidth', 1.5);
 xlabel('Orbit Number');
 ylabel('a\deltai_y [m]');
 grid on;
@@ -298,7 +310,7 @@ axis equal;
 
 % 8) Plot control acceleration level
 figure;
-plot(orbit_num, a_hist);
+plot(t_orbit, a_hist);
 xlabel('Orbit Number'); ylabel('Acceleration magnitude (m/s^2)');
 %title('Control Acceleration Level');
 
@@ -342,51 +354,70 @@ total_dv = sum(abs(dv_hist(:)));
 fprintf('Total Δv = %.3f m/s\n', total_dv);
 figure;
 total_dv = sum(cum_dv);
-plot(orbit_num, cum_dv);
+plot(t_orbit, cum_dv);
 xlabel('Orbit Number'); ylabel('Cumulative Delta-v (m/s)');
 %title('Cumulative Delta-v');
 
+%plotting absolute orbital elements
+figure;
+subplot(3,2,1)
+plot(t_orbit, TSX_oe(:,1)); grid on;
+xlabel('Orbits'); ylabel('a [m]')
+title('Semi–major axis')
+
+subplot(3,2,2)
+plot(t_orbit, TSX_oe(:,2)); grid on;
+xlabel('Orbits'); ylabel('e')
+title('Eccentricity')
+
+subplot(3,2,3)
+plot(t_orbit, rad2deg(TSX_oe(:,3))); grid on;
+xlabel('Orbits'); ylabel('i [deg]')
+title('Inclination')
+
+subplot(3,2,4)
+plot(t_orbit, rad2deg(TSX_oe(:,4))); grid on;
+xlabel('Orbits'); ylabel('\Omega [deg]')
+title('RAAN')
+
+subplot(3,2,5)
+plot(t_orbit, rad2deg(TSX_oe(:,5))); grid on;
+xlabel('Orbits'); ylabel('\omega [deg]')
+title('Argument of perigee')
+
+subplot(3,2,6)
+plot(t_orbit, rad2deg(TSX_oe(:,6))); grid on;
+xlabel('Orbits'); ylabel('M [deg]')
+title('Mean anomaly')
 
 figure;
-plot3( TSX_ECI_hist(:,1), TSX_ECI_hist(:,2), TSX_ECI_hist(:,3), ...
-       'b-', 'LineWidth',1.5 );
-hold on;
-plot3( TDX_ECI_hist(:,1), TDX_ECI_hist(:,2), TDX_ECI_hist(:,3), ...
-       'r-', 'LineWidth',1.5 );
+subplot(3,2,1)
+plot(t_orbit, TDX_oe(:,1)); grid on;
+xlabel('Orbits'); ylabel('a [m]')
+title('Semi–major axis')
 
-% Optional: mark start and end
-plot3( TSX_ECI_hist(1,1), TSX_ECI_hist(1,2), TSX_ECI_hist(1,3), 'bo', 'MarkerSize',6 );
-plot3( TDX_ECI_hist(1,1), TDX_ECI_hist(1,2), TDX_ECI_hist(1,3), 'ro', 'MarkerSize',6 );
-plot3( TSX_ECI_hist(end,1), TSX_ECI_hist(end,2), TSX_ECI_hist(end,3), 'b*', 'MarkerSize',6 );
-plot3( TDX_ECI_hist(end,1), TDX_ECI_hist(end,2), TDX_ECI_hist(end,3), 'r*', 'MarkerSize',6 );
+subplot(3,2,2)
+plot(t_orbit, TDX_oe(:,2)); grid on;
+xlabel('Orbits'); ylabel('e')
+title('Eccentricity')
 
-legend('Chief','Deputy','Location','best');
-grid on; axis equal;
-xlabel('ECI X (m)');
-ylabel('ECI Y (m)');
-zlabel('ECI Z (m)');
-%title('3D ECI Trajectories: Chief (blue) \& Deputy (red)');
+subplot(3,2,3)
+plot(t_orbit, rad2deg(TDX_oe(:,3))); grid on;
+xlabel('Orbits'); ylabel('i [deg]')
+title('Inclination')
 
-%--- your “pre” and “post” ROE (6×1), same ordering as your script
-rel_pre  = [0; 0; 0; 300; 0; 400]/a_TSX_init;
-rel_post = [0; 0; 0; 300; 0; 500]/a_TSX_init;
+subplot(3,2,4)
+plot(t_orbit, rad2deg(TDX_oe(:,4))); grid on;
+xlabel('Orbits'); ylabel('\Omega [deg]')
+title('RAAN')
 
-%--- extract the Δδe and Δδi vectors
-delta_e = rel_post(2:3) - rel_pre(2:3);   % [Δδex; Δδey]
-delta_i = rel_post(4:5) - rel_pre(4:5);   % [Δδix; Δδiy]
+subplot(3,2,5)
+plot(t_orbit, rad2deg(TDX_oe(:,5))); grid on;
+xlabel('Orbits'); ylabel('\omega [deg]')
+title('Argument of perigee')
 
-norm_de = norm(delta_e);
-norm_di = norm(delta_i);
-
-%--- chief OE (from your main script)
-a_c = 6886536.686;        % [m]
-e_c = 0.0001264;          % [–]
-mu  = 3.986004418e14;     % [m^3/s^2]
-
-n_c   = sqrt(mu/a_c^3);   % [rad/s]
-eta_c = sqrt(1 - e_c^2);   % [–]
-
-%--- Eq (73) lower‐bound Δv
-dv_lb = (a_c*n_c/eta_c)*( norm_de/2  +  (1-e_c)*norm_di );
-
-fprintf('Theoretical Δv lower bound: %.4f m/s\n', dv_lb);
+subplot(3,2,6)
+plot(t_orbit, rad2deg(TDX_oe(:,6))); grid on;
+xlabel('Orbits'); ylabel('M [deg]')
+title('Mean anomaly')
+title("TSX Orbital Elements");
