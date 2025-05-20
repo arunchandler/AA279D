@@ -70,8 +70,8 @@ orbit_num = floor(t_orbit) + 1;
 
 %Lyapunov parameters and thrust limit
 k     = 1e3;      % Lyapunov scaling
-N_ip  = 4;       % in-plane exponent
-N_oop = 4;       % out-of-plane exponent
+N_ip  = 14;       % in-plane exponent
+N_oop = 14;       % out-of-plane exponent
 u_max = 1e-4;     % maximum thrust accel (m/s^2)
 
 %propagation with delta Vs
@@ -86,6 +86,9 @@ TDX_oe(1,:) = TDX_init_oe;
 rel_oe = zeros(num_points, 6);
 rel_oe(1,:) = TSX_init_oe(1)*compute_roes(TSX_init_oe, TDX_init_oe);
 
+TSX_ECI_hist = zeros(num_points,3);
+TDX_ECI_hist = zeros(num_points,3);
+
 state_cur = rel_state_init;
 TSX_oe_cur = TSX_init_oe;
 TDX_oe_cur = TDX_init_oe;
@@ -93,6 +96,9 @@ TSX_ECI_cur = TSX_init_rv;
 TDX_ECI_cur = TDX_init_rv;
 TDX_RTN_cur = TDX_init_rtn;
 rel_oe_cur = rel_qns_pre;
+
+TSX_ECI_hist(1,:) = TSX_init_rv(1:3)';    % chief initial ECI pos
+TDX_ECI_hist(1,:) = TDX_init_rv(1:3)';  
 
 %Control history
 u_hist   = zeros(3, num_points);
@@ -124,24 +130,24 @@ for idx = 2:num_points
     P5 = (1/k) * diag([cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Jp)^N_ip; cos(Hp)^N_oop; cos(Hp)^N_oop]);
 
     %dv for Delta da for dlambda_dot
-    % e_cur = TSX_oe_cur(2);
-    % f_cur = mean2true(TSX_oe_cur(6), e_cur, tol);
-    % da_cur = rel_oe_cur(1);
-    % dlambda_cur = rel_oe_cur(2);
-    % dlambda_dot_cur = -3/2*n_cur*da_cur;
+    e_cur = TSX_oe_cur(2);
+    f_cur = mean2true(TSX_oe_cur(6), e_cur, tol);
+    da_cur = rel_oe_cur(1);
+    dlambda_cur = rel_oe_cur(2);
+    dlambda_dot_cur = -3/2*n_cur*da_cur;
     % 
-    % Ddlambda = dlambda_cur - dlambda_nom;
-    % tau = 1000000;
-    % dlambda_dot_des = - Ddlambda/tau;
+    Ddlambda = dlambda_cur - dlambda_nom;
+    tau = 1000000;
+    dlambda_dot_des = - Ddlambda/tau;
     % 
-    % Dda_tan = -2/3* dlambda_dot_des / n_cur;
+    Dda_tan = -2/3* dlambda_dot_des / n_cur;
     % 
-    % dvt = Dda_tan * n_cur / (2 * (1+e_cur*cos(f_cur)));
-    % u_dvt = dvt / dt;
+    dvt = Dda_tan * n_cur / (2 * (1+e_cur*cos(f_cur)));
+    u_dvt = dvt / dt;
 
     % control
     u = [0.0; -pinv(B5) * (A5*delta_cur(1:5)' + P5*Delta5')]; % no r dv
-    % u(2) = u(2) + u_dvt;
+    u(2) = u(2) + u_dvt;
     dv = u .* dt;
     un = norm(u);
 
@@ -161,6 +167,10 @@ for idx = 2:num_points
     TDX_ECI_next = TDX_ECI_next(2,:)';
     [t_out, TSX_ECI_next] = ode4(@compute_rates_rv_perturbed, [t_cur, t_next]', TSX_ECI_cur,  dt);
     TSX_ECI_next = TSX_ECI_next(2,:)';
+
+    TSX_ECI_hist(idx,:) = TSX_ECI_next(1:3)'; 
+    TDX_ECI_hist(idx,:) = TDX_ECI_next(1:3)';
+
     [TDX_RTN_next, ~] = eci2rtn(TSX_ECI_next, TDX_ECI_next);
     state_next = [TDX_RTN_next; TSX_ECI_next]';
     state_out(idx,:) = state_next;
@@ -191,6 +201,7 @@ end
 % --- RTN frame plots ---
 % TR projection
 figure;
+subplot(1,3,1);
 plot(state_out(:,2), state_out(:,1));
 xlabel('T [m]');
 ylabel('R [m]');
@@ -198,7 +209,7 @@ grid on;
 axis equal;
 
 % NR projection
-figure;
+subplot(1,3,2);
 plot(state_out(:,3), state_out(:,1));
 xlabel('N [m]');
 ylabel('R [m]');
@@ -206,7 +217,7 @@ grid on;
 axis equal;
 
 % TN projection
-figure;
+subplot(1,3,3);
 plot(state_out(:,2), state_out(:,3));
 xlabel('T [m]');
 ylabel('N [m]');
@@ -289,19 +300,93 @@ axis equal;
 figure;
 plot(orbit_num, a_hist);
 xlabel('Orbit Number'); ylabel('Acceleration magnitude (m/s^2)');
-title('Control Acceleration Level');
+%title('Control Acceleration Level');
 
-figure;
-plot(phi_hist, a_hist');
-xlabel('Argument of Latitude (rad)'); ylabel('Acceleration (m/s^2)');
-title('Control vs Argument of Latitude');
+% assume phi_hist and a_hist are both (N×1)
+phi = wrapTo2Pi(phi_hist);
+a   = a_hist;
+
+% find where φ jumps backwards by more than π
+dphi = diff(phi);
+wrapIdx = find(dphi < -pi);
+
+% break the line at each wrap
+for k = 1:numel(wrapIdx)
+  i = wrapIdx(k)+1;      % index of the wrapped point
+  phi(i) = NaN;
+  a(i)   = NaN;
+end
+
+% now plot without the wrap‐around line
+figure
+plot(phi, a);
+xlabel('Argument of Latitude \phi (rad)')
+ylabel('Acceleration magnitude (m/s^2)')
+%title('Control vs Argument of Latitude (no wrap)')
+grid on
+
+phi_unw = unwrap(phi_hist);
+figure
+plot(phi_unw, a_hist)
+xlabel('Unwrapped Argument of Latitude \phi (rad)')
+ylabel('Acceleration magnitude (m/s^2)')
+%title('Control vs Unwrapped Argument of Latitude')
+grid on
 
 % cumulative delta-v
 cum_dv_r = cumsum(abs(dv_hist(1,:)));
 cum_dv_t = cumsum(abs(dv_hist(2,:)));
 cum_dv_n = cumsum(abs(dv_hist(3,:)));
 cum_dv = cum_dv_r + cum_dv_t + cum_dv_n;
+total_dv = sum(abs(dv_hist(:)));  
+fprintf('Total Δv = %.3f m/s\n', total_dv);
 figure;
+total_dv = sum(cum_dv);
 plot(orbit_num, cum_dv);
 xlabel('Orbit Number'); ylabel('Cumulative Delta-v (m/s)');
-title('Cumulative Delta-v');
+%title('Cumulative Delta-v');
+
+
+figure;
+plot3( TSX_ECI_hist(:,1), TSX_ECI_hist(:,2), TSX_ECI_hist(:,3), ...
+       'b-', 'LineWidth',1.5 );
+hold on;
+plot3( TDX_ECI_hist(:,1), TDX_ECI_hist(:,2), TDX_ECI_hist(:,3), ...
+       'r-', 'LineWidth',1.5 );
+
+% Optional: mark start and end
+plot3( TSX_ECI_hist(1,1), TSX_ECI_hist(1,2), TSX_ECI_hist(1,3), 'bo', 'MarkerSize',6 );
+plot3( TDX_ECI_hist(1,1), TDX_ECI_hist(1,2), TDX_ECI_hist(1,3), 'ro', 'MarkerSize',6 );
+plot3( TSX_ECI_hist(end,1), TSX_ECI_hist(end,2), TSX_ECI_hist(end,3), 'b*', 'MarkerSize',6 );
+plot3( TDX_ECI_hist(end,1), TDX_ECI_hist(end,2), TDX_ECI_hist(end,3), 'r*', 'MarkerSize',6 );
+
+legend('Chief','Deputy','Location','best');
+grid on; axis equal;
+xlabel('ECI X (m)');
+ylabel('ECI Y (m)');
+zlabel('ECI Z (m)');
+%title('3D ECI Trajectories: Chief (blue) \& Deputy (red)');
+
+%--- your “pre” and “post” ROE (6×1), same ordering as your script
+rel_pre  = [0; 0; 0; 300; 0; 400]/a_TSX_init;
+rel_post = [0; 0; 0; 300; 0; 500]/a_TSX_init;
+
+%--- extract the Δδe and Δδi vectors
+delta_e = rel_post(2:3) - rel_pre(2:3);   % [Δδex; Δδey]
+delta_i = rel_post(4:5) - rel_pre(4:5);   % [Δδix; Δδiy]
+
+norm_de = norm(delta_e);
+norm_di = norm(delta_i);
+
+%--- chief OE (from your main script)
+a_c = 6886536.686;        % [m]
+e_c = 0.0001264;          % [–]
+mu  = 3.986004418e14;     % [m^3/s^2]
+
+n_c   = sqrt(mu/a_c^3);   % [rad/s]
+eta_c = sqrt(1 - e_c^2);   % [–]
+
+%--- Eq (73) lower‐bound Δv
+dv_lb = (a_c*n_c/eta_c)*( norm_de/2  +  (1-e_c)*norm_di );
+
+fprintf('Theoretical Δv lower bound: %.4f m/s\n', dv_lb);
