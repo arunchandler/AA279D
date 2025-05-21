@@ -9,7 +9,7 @@ J2 = 1.082626e-3;
 mu = 3.986004418e14; % (m^3/s^2)
 s_d = 86400; % seconds per day
 
-%% Problem 1 - relative dynamics without control
+% Problem 1 - relative dynamics without control
 
 scenario = input( ...
     ['Select rel_qns_init scenario:\n' ...
@@ -240,13 +240,14 @@ xlabel('a\delta i_x [m]'); ylabel('a\delta i_y [m]');
 title('Relative OE: a\delta i_x vs a\delta i_y');
 legend('Propagated','STM','Location','best');
 
-%% Problem 2 - reconfiguration
-
+% Problem 2 - reconfiguration
 
 scenario = input( ...
     ['Select reconfiguration scenario:\n' ...
      '  1: M-D2 to M-D3\n' ...
      '  2: M-D3 to M-D4\n' ...
+     '  3: Test Reconfiguration\n' ...
+     '  4: Test Formation Keeping' ...
      'Your choice: '] );
 
 switch scenario
@@ -261,6 +262,18 @@ switch scenario
         rel_qns_pre = [0, 0, 0, 300, 0, 500];
         rel_qns_post  = [0, 0, 0, 500, 0, 300];
         scenario_name = 'M-D3 to M-D4';
+
+    case 3
+        % Test
+        rel_qns_pre = [0, 0, 500, 500, 500, 500];
+        rel_qns_post  = [0, 0, 300, 300, 300, 300];
+        scenario_name = 'Test Reconfiguration';
+
+    case 4
+        % Test Formation Keeping
+        rel_qns_pre = [0, 0, 500, 500, 500, 500];
+        rel_qns_post = [0, 0, 500, 500, 500, 500];
+        senario_name = 'Test Formation Keeping';
         
     otherwise
         error('Invalid scenario');
@@ -278,7 +291,9 @@ rel_state_init = [TDX_init_rtn; TSX_init_rv];
 state_out = zeros(num_points, 12);
 state_out(1,:) = rel_state_init';
 
+TSX_oe_2 = zeros(num_points, 6);
 TDX_oe_2 = zeros(num_points, 6);
+TSX_oe_2(1,:) = TSX_init_oe;
 TDX_oe_2(1,:) = TDX_init_oe_2;
 
 rel_oe_2 = zeros(num_points, 6);
@@ -286,46 +301,32 @@ rel_oe_2(1,:) = a_TSX_init*compute_roes(TSX_init_oe, TDX_init_oe_2);
 
 state_cur = rel_state_init;
 
-% --- precompute target indices ---
-% chief argument of latitude array:
-u_TSX = wrapTo2Pi(TSX_oe(:,6)) + TSX_oe(:,5);
-target_orbit = 7;
-mask = (orbit_num == target_orbit);
+% ----naive least squares----
 
-% delta V calculation
+%delta v time calculations
+n_man = 3;
 
-Ddiy     = rel_qns_post(6) - rel_qns_pre(6);
-Ddey     = rel_qns_post(4) - rel_qns_pre(4);
-Ddlambda = rel_qns_post(2) - rel_qns_pre(2);
+delta_v_times = linspace(tstart, tend, n_man+2);
+delta_v_times = delta_v_times(2:end-1)
+delta_v_vals = naive_least_squares(delta_v_times, rel_qns_pre'./a_TSX_init, rel_qns_post'./a_TSX_init, TSX_init_oe, u_TSX_init, tstart, tend)
 
-a_m = TSX_oe(num_points/2,1);
+mask = (orbit_num == orbit_num);
 
-%out of plane portion
-uM_op = pi/2
-dvn = Ddiy * n / sin(uM_op);
+DV1 = norm(delta_v_vals(:,1));
+DV2 = norm(delta_v_vals(:,2));
+DV3 = norm(delta_v_vals(:,3));
+DVT = DV1 + DV2 + DV3;
+DV = sqrt( sum(delta_v_vals.^2, 2) );
 
-%in plane portion
-dvt = 0.0; %because we dont want sma change, we can set this to 0 and choose dvr to satisfy change in dey
-uM_ip1 = 0.0
-uM_ip2 = pi - uM_ip1
-dvr1 = Ddey * n * a_m / (-2 * cos(uM_ip1));
-dvr2 = -dvr1;
+tmp = find(mask);  % list of indices
+[~,loc]    = min(abs(t_grid - delta_v_times(1)));
+idx_1    = tmp(loc);
 
-% --- compute total delta‐V ---
-DV_op  = abs(dvn);        % out‐of‐plane impulse magnitude
-DV_ip1 = abs(dvr1);       % in‐plane impulse at u = 0
-DV_ip2 = abs(dvr2);       % in‐plane impulse at u = pi
-DV_tot = DV_op + DV_ip1 + DV_ip2;
+[~,loc]    = min(abs(t_grid - delta_v_times(2)));
+idx_2    = tmp(loc);
 
-tmp = find(mask);  % list of indices in orbit 7
-[~,loc]    = min(abs(u_TSX(mask) - uM_ip1));
-idx_ip1    = tmp(loc);
-
-[~,loc]    = min(abs(u_TSX(mask) - uM_ip2));
-idx_ip2    = tmp(loc);
-
-[~,loc]    = min(abs(u_TSX(mask) - uM_op ));
-idx_op     = tmp(loc);
+[~,loc]    = min(abs(t_grid - delta_v_times(3)));
+idx_3     = tmp(loc);
 
 for idx = 2:num_points
 
@@ -336,35 +337,33 @@ for idx = 2:num_points
     TDX_RTN_cur = state_cur(1:6);
 
     % apply ΔV’s at the target indices
-    if idx == idx_ip1
-        TDX_RTN_cur(4) = TDX_RTN_cur(4) + dvr1;
-        fprintf('ip1\n');
+    if idx == idx_1
+        TDX_RTN_cur(4:6) = TDX_RTN_cur(4:6) + delta_v_vals(1,:)';
     end
-    if idx == idx_ip2
-        TDX_RTN_cur(4) = TDX_RTN_cur(4) + dvr2;
-        fprintf('ip2\n');
+    if idx == idx_2
+        TDX_RTN_cur(4:6) = TDX_RTN_cur(4:6) + delta_v_vals(2,:)';
     end
-    if idx == idx_op
-        TDX_RTN_cur(6) = TDX_RTN_cur(6) + dvn;
-        fprintf('op\n');
+    if idx == idx_3
+        TDX_RTN_cur(4:6) = TDX_RTN_cur(4:6) + delta_v_vals(3,:)';
     end
 
     % write the modified RTN back into state_cur
-    state_cur(1:6)   = TDX_RTN_cur;
-
     [TDX_ECI_cur, ~] = rtn2eci(TSX_ECI_cur, TDX_RTN_cur);
 
-    [~, state_next] = ode4(@compute_rates_rv_rel_unperturbed_RTN, [t_cur, t_next]', state_cur,  dt);
-    state_next = state_next(2,:)';
+    [~, TDX_ECI_next] = ode4(@compute_rates_rv_perturbed, [t_cur, t_next]', TDX_ECI_cur,  dt);
+    [~, TSX_ECI_next] = ode4(@compute_rates_rv_perturbed, [t_cur, t_next]', TSX_ECI_cur,  dt);
+    TDX_ECI_next = TDX_ECI_next(2,:)';
+    TSX_ECI_next = TSX_ECI_next(2,:)';
+    [TDX_RTN_next,~] = eci2rtn(TSX_ECI_next, TDX_ECI_next);
+    state_next = [TDX_RTN_next; TSX_ECI_next];
     state_out(idx,:) = state_next;
 
-    TSX_ECI_next = state_next(7:12);
-    TDX_RTN_next = state_next(1:6);
-    [TDX_ECI_next, R] = rtn2eci(TSX_ECI_next, TDX_RTN_next);
+    TSX_params = rv2oe(TSX_ECI_next, mu);
+    TSX_oe_2(idx,:) = [TSX_params(1:5), true2mean(TSX_params(6), TSX_params(2))];
     
-    a1 = TSX_oe(idx,1); e1 = TSX_oe(idx,2); i1 = TSX_oe(idx,3);
-    RAAN1 = TSX_oe(idx,4); omega1 = TSX_oe(idx,5);
-    M1 = wrapTo2Pi(TSX_oe(idx,6)); u1 = M1 + omega1;
+    a1 = TSX_oe_2(idx,1); e1 = TSX_oe_2(idx,2); i1 = TSX_oe_2(idx,3);
+    RAAN1 = TSX_oe_2(idx,4); omega1 = TSX_oe_2(idx,5);
+    M1 = wrapTo2Pi(TSX_oe_2(idx,6)); u1 = M1 + omega1;
 
     TDX_params = rv2oe(TDX_ECI_next, mu);
     TDX_oe_2(idx,:) = [TDX_params(1:5), true2mean(TDX_params(6), TDX_params(2))];
@@ -380,31 +379,43 @@ for idx = 2:num_points
 
 end
 
+daf = rel_oe_2(end,1);
+dlambdaf = rel_oe_2(end,2);
+dexf = rel_oe_2(end,3);
+deyf = rel_oe_2(end,4);
+dixf = rel_oe_2(end,5);
+diyf = rel_oe_2(end,6);
+
 % --- print Delta‑V budget ---
 fprintf('\n=== ΔV Budget ===\n');
-fprintf('Out‑of‑plane (dvn)     = %.6f m/s\n', dvn);
-fprintf('In‑plane stage 1 (dvr1) = %.6f m/s\n', dvr1);
-fprintf('In‑plane stage 2 (dvr2) = %.6f m/s\n', dvr2);
-fprintf('Total ΔV               = %.6f m/s\n\n', DV_tot);
+fprintf('DV1 = %.6f m/s\n', DV1);
+fprintf('DV2 = %.6f m/s\n', DV2);
+fprintf('DV3 = %.6f m/s\n', DV3);
+fprintf('Total ΔV = %.6f m/s\n\n', DVT);
 
 % --- print achieved QNS changes ---
 fprintf('=== QNS Element Changes ===\n');
-fprintf('Δi_y      = %.6e rad\n', Ddiy);
-fprintf('Δe_y      = %.6e    \n', Ddey);
-fprintf('Δλ (dlambda) = %.6e rad\n', Ddlambda);
+fprintf('%-12s  %-12s  %-12s\n','Element','Desired','Achieved');
+fprintf('%-12s  % .6f   % .6f\n','Δa',rel_qns_post(1),daf);
+fprintf('%-12s  % .6f   % .6f\n','Δλ',rel_qns_post(2),dlambdaf);
+fprintf('%-12s  % .6f   % .6f\n','Δe_x',rel_qns_post(3),dexf);
+fprintf('%-12s  % .6f   % .6f\n','Δe_y',rel_qns_post(4),deyf);
+fprintf('%-12s  % .6f   % .6f\n','Δi_x',rel_qns_post(5),dixf);
+fprintf('%-12s  % .6f   % .6f\n','Δi_y',rel_qns_post(6),diyf);
 
 % ——— Visualization ———
 
 % 1) Define split points for three segments
-idxs = unique([1, idx_ip1, idx_ip2, num_points]);
+idxs = unique([1, idx_1, idx_2, idx_3, num_points]);
 nSeg = numel(idxs) - 1;
 
 % 2) Colormap & legend labels
 colors = lines(nSeg);
 legend_labels = { ...
     'Before Maneuvers', ...
-    'After \delta v_r_1', ...
-    'After \delta v_r_2 and \delta v_t' ...
+    'After \Delta V1', ...
+    'After \Delta V2', ...
+    'After \Delta V3'
 };
 
 % ——— RTN‑frame relative motion ———
@@ -462,9 +473,43 @@ labels = {'a\delta a [m]', ...
 
 for k = 1:6
     nexttile;
-    plot(orbit_num, rel_oe_2(:,k));
+    plot(t_orbit, rel_oe_2(:,k));
     grid on;
     xlabel('Orbit Number');
     ylabel(labels{k});
     title(labels{k});
 end
+
+% cumulative delta-v
+cum_dv = zeros(size(t_orbit));
+cum_dv(idx_1:end) = DV1;
+cum_dv(idx_2:end) = DV1 + DV2;   
+cum_dv(idx_3:end) = DV1 + DV2 + DV3;
+figure;
+plot(t_orbit, cum_dv);
+xlabel('Orbit Number'); ylabel('Cumulative Delta-v (m/s)');
+title('Cumulative Delta-v');
+
+% --- 2D relative‐element scatter for control visualization ---
+figure;
+% Δλ vs Δa
+subplot(1,3,1);
+plot(rel_oe_2(:,2), rel_oe_2(:,1), 'LineWidth',1.2);
+xlabel('a\delta\lambda [m]');
+ylabel('a\deltaa [m]');
+grid on;
+axis equal;
+% Δe_x vs Δe_y
+subplot(1,3,2);
+plot(rel_oe_2(:,3), rel_oe_2(:,4), 'LineWidth',1.2);
+xlabel('a\deltae_x [m]');
+ylabel('a\deltae_y [m]');
+grid on;
+axis equal;
+% Δi_x vs Δi_y
+subplot(1,3,3);
+plot(rel_oe_2(:,5), rel_oe_2(:,6), 'LineWidth',1.2);
+xlabel('a\deltai_x [m]');
+ylabel('a\deltai_y [m]');
+grid on;
+axis equal;

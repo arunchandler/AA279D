@@ -183,12 +183,12 @@ for idx = 2:num_points
     state_out(idx,:) = state_next;
 
     TSX_params = rv2oe(TSX_ECI_next, mu);
-    TSX_oe_next = osc2mean([TSX_params(1:5), true2mean(TSX_params(6), TSX_params(2))]);
+    TSX_oe_next = [TSX_params(1:5), true2mean(TSX_params(6), TSX_params(2))];
     TSX_oe_next(3:6) = wrapTo2Pi(TSX_oe_next(3:6));
     TSX_oe(idx,:) = TSX_oe_next;
 
     TDX_params = rv2oe(TDX_ECI_next, mu);
-    TDX_oe_next = osc2mean([TDX_params(1:5), true2mean(TDX_params(6), TDX_params(2))]);
+    TDX_oe_next = [TDX_params(1:5), true2mean(TDX_params(6), TDX_params(2))];
     TDX_oe_next(3:6) = wrapTo2Pi(TDX_oe_next(3:6));
     TDX_oe(idx,:) = TDX_oe_next;
 
