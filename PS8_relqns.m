@@ -29,11 +29,10 @@ TSX_rv_init = oe2rv(TSX_oe_init, mu);
 % initial ROEs, elements, and state for deputy
 rel_qns_init  = [0, 0, 0, 300, 0, 500]';
 TDX_oe_init = qns2oe(TSX_oe_init, rel_qns_init);
+TDX_rv_init = oe2rv(TDX_oe_init, mu);
 
 % using GVEs cause they maintain numerical stability for longer
 
-
-% do one and three sigma 
 % timing parameters
 tstart     = 0.0;
 n          = sqrt(mu/a_TSX_init^3);
@@ -48,6 +47,7 @@ orbit_num = floor(t_orbit) + 1;
 
 % Generate ground truth
 [~, TSX_rv_gt] = ode4(@compute_rates_rv_perturbed, [tstart,tend]', TSX_rv_init, dt);
+[~, TDX_rv_gt] = ode4(@compute_rates_rv_perturbed, [tstart,tend]', TDX_rv_init, dt);
 [~, TSX_oe_gt] = ode4(@compute_rates_GVE_J2, [tstart,tend]', TSX_oe_init, dt);
 [~, TDX_oe_gt] = ode4(@compute_rates_GVE_J2, [tstart,tend]', TDX_oe_init, dt);
 rel_oe_gt = zeros(num_points,6);
@@ -64,9 +64,11 @@ sigma_roe = diag([sigma_qns^2*ones(6,1)]);
 N = length(t_grid);
 
 noise_TSX = (sqrtm(sigma_rv) * randn(6, N))';
+noise_TDX = (sqrtm(sigma_rv) * randn(6, N))';
 noise_roe = (sqrtm(sigma_roe) * randn(6, N))';
 
 TSX_rv_meas = TSX_rv_gt + noise_TSX;
+TDX_rv_meas = TDX_rv_gt + noise_TDX;
 roe_meas = rel_oe_gt + noise_roe;
 
 % Set initial estimate and covariance
@@ -86,7 +88,7 @@ P0_roe = sigma_roe;
 Q = P0/10;
 R = P0;
 Q_roe = 2 * P0_roe;
-R_roe = 1 * P0_roe;
+R_roe = P0_roe;
 
 % delta lambda hardest to observe but if feeding the whole state there
 % shouldn't be drift
@@ -142,10 +144,10 @@ P_TSX_k1k1 = P0;
 P_hist = zeros(num_points,6,6);
 P_hist(1,:,:) = P0_roe;
 P_k1k1 = P0_roe;
-y_TSX_prefit   = zeros(num_points,6);
-y_TSX_postfit  = zeros(num_points,6);
-y_prefit   = zeros(num_points,6);
-y_postfit  = zeros(num_points,6);
+resid_TSX_prefit   = zeros(num_points,6);
+resid_TSX_postfit  = zeros(num_points,6);
+resid_prefit   = zeros(num_points,6);
+resid_postfit  = zeros(num_points,6);
 
 TSX_oe = TSX_oe_init;
 
@@ -170,13 +172,14 @@ for idx = 2:num_points
     P_kk1 = F * P_k1k1 * F.' + Q_roe;
     P_TSX_kk1 = P_TSX_k1k1 + Pdot_TSX_kk1 .* dt;
 
-    y = roe_meas(idx,:)' - x_kk1;
-    y_TSX = TSX_rv_meas(idx,:)' - TSX_x_kk1;
-    y_prefit(idx,:) = y';
-    y_TSX_prefit(idx,:) = y_TSX';
+    resid = roe_meas(idx,:)' - x_kk1;
+    resid_TSX = TSX_rv_meas(idx,:)' - TSX_x_kk1;
+    resid_prefit(idx,:) = resid';
+    resid_TSX_prefit(idx,:) = resid_TSX';
 
     % -------- UPDATE --------
-
+    y = resid;
+    y_TSX = resid_TSX;
     % H should be from ROE to ECI
 
     H = eye(6);
@@ -194,8 +197,8 @@ for idx = 2:num_points
     P_hist(idx, :,:) = P_kk;
     P_TSX_hist(idx, :,:) = P_TSX_kk;
 
-    y_postfit(idx,:) = (roe_meas(idx,:)' - x_kk)';
-    y_TSX_postfit(idx,:) = (TSX_rv_meas(idx,:)' - TSX_x_kk)';
+    resid_postfit(idx,:) = (roe_meas(idx,:)' - x_kk)';
+    resid_TSX_postfit(idx,:) = (TSX_rv_meas(idx,:)' - TSX_x_kk)';
 
     % Store state and update P and x
     roe_ekf(idx,:) = x_kk;
@@ -329,9 +332,9 @@ end
 figure;
 for i = 1:6
     ax_rel(i) = subplot(3,2,i);
-    plot(t_orbit, y_prefit(:,i),  'b-'); hold on;
+    plot(t_orbit, resid_prefit(:,i),  'b-'); hold on;
     plot(t_orbit, noise_roe(:,i),     'r--');
-    plot(t_orbit, y_postfit(:,i), 'g-');
+    plot(t_orbit, resid_postfit(:,i), 'g-');
     ylabel(roe_labels{i});
     if i>4, xlabel('Orbit #'); end
     hold off;
@@ -342,9 +345,9 @@ legend(ax_rel(1), {'prefit','injected noise','postfit'}, 'Location','best');
 figure;
 for i = 1:6
     ax_tsx(i) = subplot(3,2,i);
-    plot(t_orbit, y_TSX_prefit(:,i),  'b-'); hold on;
+    plot(t_orbit, resid_TSX_prefit(:,i),  'b-'); hold on;
     plot(t_orbit, noise_TSX(:,i),     'r--');
-    plot(t_orbit, y_TSX_postfit(:,i), 'g-');
+    plot(t_orbit, resid_TSX_postfit(:,i), 'g-');
     ylabel(state_labels{i});
     if i>4, xlabel('Orbit #'); end
     hold off;
