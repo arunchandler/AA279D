@@ -36,7 +36,7 @@ n          = sqrt(mu/a_TSX_init^3);
 T          = 2*pi/n;
 n_orbit    = 15;
 tend       = n_orbit*T;
-num_points = 10000;
+num_points = 1000;
 dt         = (tend - tstart)/(num_points-1);
 t_grid     = linspace(tstart, tend, num_points).';
 t_orbit    = t_grid / T;
@@ -68,25 +68,32 @@ Q = 2 * P0;
 R = 0.5 * P0; % Might need to change
 
 % Set up and propagate EKF
-TSX_rv_ekf_prefit = zeros(num_points,6);
-TDX_rv_ekf_prefit = zeros(num_points,6);
-TSX_rv_ekf_prefit(1,:) = TSX_x0;
-TDX_rv_ekf_prefit(1,:) = TDX_x0;
+TSX_rv_noisy_arr = zeros(num_points,6);
+TSX_rv_noisy = TSX_x0;
+TSX_rv_noisy_arr(1,:) = TSX_x0;
 TSX_rv_ekf = zeros(num_points, 6);
 TDX_rv_ekf = zeros(num_points, 6);
 TSX_rv_ekf(1,:) = TSX_x0;
 TDX_rv_ekf(1,:) = TDX_x0;
 TSX_x_k1k1 = TSX_x0;
 TDX_x_k1k1 = TDX_x0;
+P_TSX_hist = zeros(num_points,6,6);
+P_TDX_hist = zeros(num_points,6,6);
+P_TSX_hist(1,:,:) = P0;
+P_TDX_hist(1,:,:) = P0;
 P_TSX_k1k1 = P0;
 P_TDX_k1k1 = P0;
+y_TSX_prefit   = zeros(num_points,6);
+y_TSX_postfit  = zeros(num_points,6);
+y_TDX_prefit   = zeros(num_points,6);
+y_TDX_postfit  = zeros(num_points,6);
 
 for idx = 2:num_points
 
     t = t_grid(idx-1);
     t_next = t+dt;
 
-    % -------- UPDATE ---------
+    % -------- PREDICT ---------
     % Uncomment for STM propagation ---------
     % F_TSX = compute_F_j2(TSX_x_k1k1);
     % F_TDX = compute_F_j2(TDX_x_k1k1);
@@ -103,6 +110,11 @@ for idx = 2:num_points
     TDX_x_kk1 = TDX_x_kk1(2,:)' + (sqrtm(sigma_rv) * randn(6, 1));
     % ----------------------------------------
 
+    % Unfiltered noisy propagation
+    [~, TSX_rv_noisy] = ode4(@compute_rates_rv_perturbed, [t,t_next]', TSX_rv_noisy, dt);
+    TSX_rv_noisy = TSX_rv_noisy(2,:)' + (sqrtm(sigma_rv) * randn(6, 1));
+    TSX_rv_noisy_arr(idx,:) = TSX_rv_noisy;
+
     F_TSX = compute_F_j2(TSX_x_kk1(1:3)); % This F is for continuous EKF, so next lines will be Pdot, not P
     F_TDX = compute_F_j2(TDX_x_kk1(1:3));
     Pdot_TSX_kk1 = F_TSX * P_TSX_k1k1 * F_TSX.' + Q;
@@ -110,10 +122,12 @@ for idx = 2:num_points
     P_TSX_kk1 = P_TSX_k1k1 + Pdot_TSX_kk1 .* dt;
     P_TDX_kk1 = P_TDX_k1k1 + Pdot_TDX_kk1 .* dt;
 
-    TSX_rv_ekf_prefit(idx, :) = TSX_x_kk1;
-    TDX_rv_ekf_prefit(idx, :) = TDX_x_kk1;
+    y_TSX = TSX_rv_meas(idx,:)' - TSX_x_kk1;
+    y_TDX = TDX_rv_meas(idx,:)' - TDX_x_kk1;
+    y_TSX_prefit(idx,:) = y_TSX';
+    y_TDX_prefit(idx,:) = y_TDX';
 
-    % -------- PREDICT --------
+    % -------- UPDATE --------
     y_TSX = TSX_rv_meas(idx,:)' - TSX_x_kk1;
     y_TDX = TDX_rv_meas(idx,:)' - TDX_x_kk1;
 
@@ -130,12 +144,17 @@ for idx = 2:num_points
 
     P_TSX_kk = (eye(6) - K_TSX * H_TSX) * P_TSX_kk1;
     P_TDX_kk = (eye(6) - K_TDX * H_TDX) * P_TDX_kk1;
+    P_TSX_hist(idx, :,:) = P_TSX_kk;
+    P_TDX_hist(idx, :,:) = P_TDX_kk;
+
+    y_TSX_postfit(idx,:) = (TSX_rv_meas(idx,:)' - TSX_x_kk)';
+    y_TDX_postfit(idx,:) = (TDX_rv_meas(idx,:)' - TDX_x_kk)';
 
     % Store state and update P and x
     TSX_rv_ekf(idx,:) = TSX_x_kk;
     TDX_rv_ekf(idx,:) = TDX_x_kk;
     TSX_x_k1k1 = TSX_x_kk;
-    TDX_x_k1k1 = TSX_x_kk;
+    TDX_x_k1k1 = TDX_x_kk;
     P_TSX_k1k1 = P_TSX_kk;
     P_TDX_k1k1 = P_TDX_kk;
 
@@ -144,56 +163,154 @@ end
 % Plotting ------------------------------------------
 state_labels = {'r_x error [m]','r_y error [m]','r_z error [m]','v_x error [m/s]','v_y error [m/s]','v_z error [m/s]'};
 
-%True & filtered states
+% --- TSX true vs. filtered ---
+figure;
+for idx = 1:6
+    ax_tsx(idx) = subplot(3,2,idx);
+    plot(t_orbit, TSX_rv_gt(:, idx),  'b-'); hold on;
+    plot(t_orbit, TSX_rv_ekf(:, idx), '--r');
+    ylabel(state_labels{idx});
+    if idx >= 5, xlabel('Time (s)'); end
+    hold off;
+end
+legend(ax_tsx(1), {'True','Filtered'}, 'Location','best');
+%sgtitle('TSX: True vs. Filtered State Trajectories');
+
+
+% --- TDX true vs. filtered ---
+figure;
+for idx = 1:6
+    ax_tdx(idx) = subplot(3,2,idx);
+    plot(t_orbit, TDX_rv_gt(:, idx),  'b-'); hold on;
+    plot(t_orbit, TDX_rv_ekf(:, idx), '--r');
+    ylabel(state_labels{idx});
+    if idx >= 5, xlabel('Time (s)'); end
+    hold off;
+end
+legend(ax_tdx(1), {'True','Filtered'}, 'Location','best');
+%sgtitle('TDX: True vs. Filtered State Trajectories');
+
+
+% Filtered error - including covariance bounds
 figure;
 for idx = 1:6
     subplot(3,2,idx)
-    plot(t_orbit, TSX_rv_gt(:, idx), '-')
-    hold on
-    plot(t_orbit, TSX_rv_ekf(:, idx), '--')
-    ylabel(state_labels{idx})
-    if idx == 5 || idx == 6
-        xlabel('Time (s)')
+    hold on;
+    
+    err    = TSX_rv_ekf(:,idx) - TSX_rv_gt(:,idx);
+    sigma1 = squeeze(sqrt( P_TSX_hist(:,idx,idx) ));
+    sigma2 = 2*sigma1;
+    
+    h_err = plot(t_orbit, err);               % error
+    h1    = plot(t_orbit, +sigma1, 'r--');          % +1σ
+    plot(   t_orbit, -sigma1, 'r--');
+    h2    = plot(t_orbit, +sigma2,'m--');           % +2σ
+    plot(   t_orbit, -sigma2,'m--');              % –2σ
+    
+    ylabel([state_labels{idx} ' error']);
+    if idx>4, xlabel('Orbit #'); end
+    
+    if idx==1
+      legend([h_err h1 h2], ...
+             'error','\pm1\sigma','\pm2\sigma', ...
+             'Location','best');
     end
+    
+    hold off;
 end
 
 figure;
 for idx = 1:6
     subplot(3,2,idx)
-    plot(t_orbit, TDX_rv_gt(:, idx), '-')
-    hold on
-    plot(t_orbit, TDX_rv_ekf(:, idx), '--')
-    ylabel(state_labels{idx})
-    if idx == 5 || idx == 6
-        xlabel('Time (s)')
+    hold on;
+    
+    err    = TDX_rv_ekf(:,idx) - TDX_rv_gt(:,idx);
+    sigma1 = squeeze(sqrt( P_TDX_hist(:,idx,idx) ));
+    sigma2 = 2*sigma1;
+    
+    h_err = plot(t_orbit, err);
+    h1    = plot(t_orbit, +sigma1, 'r--');
+    plot(   t_orbit, -sigma1, 'r--');
+    h2    = plot(t_orbit, +sigma2,'m--');
+    plot(   t_orbit, -sigma2,'m--');
+    
+    ylabel([state_labels{idx} ' error']);
+    if idx>4, xlabel('Orbit #'); end
+    
+    if idx==1
+      legend([h_err h1 h2], ...
+             'error','\pm1\sigma','\pm2\sigma', ...
+             'Location','best');
     end
+    
+    hold off;
 end
 
+% True statistics
+last_orbit_idx = t_orbit >= (n_orbit-1);  
+
+err_TSX = TSX_rv_ekf   - TSX_rv_gt;    % [num_points×6]
+err_TDX = TDX_rv_ekf   - TDX_rv_gt;    
+
+mean_TSX = mean( err_TSX(last_orbit_idx,:), 1 );    % 1×6
+std_TSX  =   std( err_TSX(last_orbit_idx,:),  0,1 ); % 1×6
+
+mean_TDX = mean( err_TDX(last_orbit_idx,:), 1 );
+std_TDX  =   std( err_TDX(last_orbit_idx,:),  0,1 );
+
+fprintf('\nTSX steady‐state error over last orbit:\n');
+for i=1:6
+    fprintf('  %s:   mean = %+8.3e   std = %8.3e\n', ...
+            state_labels{i}, mean_TSX(i), std_TSX(i));
+end
+
+fprintf('\nTDX steady‐state error over last orbit:\n');
+for i=1:6
+    fprintf('  %s:   mean = %+8.3e   std = %8.3e\n', ...
+            state_labels{i}, mean_TDX(i), std_TDX(i));
+end
+
+% Pre-fit & Post-fit residuals
+figure;
+for i = 1:6
+    ax_tsx(i) = subplot(3,2,i);
+    plot(t_orbit, y_TSX_prefit(:,i),  'b-'); hold on;
+    plot(t_orbit, noise_TSX(:,i),     'r--');
+    plot(t_orbit, y_TSX_postfit(:,i), 'g-');
+    ylabel(state_labels{i});
+    if i>4, xlabel('Orbit #'); end
+    hold off;
+end
+% one legend on the first subplot only:
+legend(ax_tsx(1), {'prefit','injected noise','postfit'}, 'Location','best');
+%sgtitle('TSX residuals vs. injected noise');
+
+figure;
+for i = 1:6
+    ax_tdx(i) = subplot(3,2,i);
+    plot(t_orbit, y_TDX_prefit(:,i),  'b-'); hold on;
+    plot(t_orbit, noise_TDX(:,i),     'r--');
+    plot(t_orbit, y_TDX_postfit(:,i), 'g-');
+    ylabel(state_labels{i});
+    if i>4, xlabel('Orbit #'); end
+    hold off;
+end
+% one legend on the first subplot only:
+legend(ax_tdx(1), {'prefit','injected noise','postfit'}, 'Location','best');
+%sgtitle('TDX residuals vs. injected noise');
+
+% Unfiltered Propagation comparison
 figure;
 for idx = 1:6
     subplot(3,2,idx)
-    plot(t_orbit, TSX_rv_ekf_prefit(:, idx) - TSX_rv_gt(:, idx), '-')
-    ylabel(state_labels{idx})
-    if idx == 5 || idx == 6
-        xlabel('Time (s)')
-    end
+    hold on;
+    
+    err    = TSX_rv_noisy_arr(:,idx) - TSX_rv_gt(:,idx);
+    
+    h_err = plot(t_orbit, err);               % error
+    
+    ylabel([state_labels{idx} ' error']);
+    if idx>4, xlabel('Orbit #'); end
+    
+    hold off;
 end
-
-figure;
-for idx = 1:6
-    subplot(3,2,idx)
-    plot(t_orbit, TSX_rv_ekf(:, idx) - TSX_rv_gt(:, idx), '-')
-    ylabel(state_labels{idx})
-    if idx == 5 || idx == 6
-        xlabel('Time (s)')
-    end
-end
-
-% figure;
-% plot3(TSX_rv_gt(:,1), TSX_rv_gt(:,2), TSX_rv_gt(:,3), 'k-', 'DisplayName','GT'); 
-% hold on;
-% plot3(TSX_rv_ekf(:,1), TSX_rv_ekf(:,2), TSX_rv_ekf(:,3), 'b--', 'DisplayName','EKF');
-% grid on;    axis equal;
-% xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]');
-% legend('Location','best');
-% title('TSX: 3D Trajectory—EKF vs. Ground Truth');
