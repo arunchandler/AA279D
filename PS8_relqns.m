@@ -10,7 +10,7 @@ mu  = 3.986004418e14;   % m^3/s^2
 s_d = 86400;            % s/day
 sigma_pos = 1;
 sigma_vel = 0.001;
-sigma_qns = 1e-6;
+sigma_qns = 1e-4;
 
 % initial cheif elements & state
 a_TSX_init    = 6886536.686;  % m
@@ -27,11 +27,8 @@ TSX_oe_init = [a_TSX_init, e_TSX_init, i_TSX_init, ...
 TSX_rv_init = oe2rv(TSX_oe_init, mu);
 
 % initial ROEs, elements, and state for deputy
-rel_qns_m_init  = [0, 0, 0, 300, 0, 500]';
-TDX_oe_init = qns2oe(TSX_oe_init, rel_qns_m_init);
-
-a_c = TSX_oe_init(1);
-rel_qns_init = rel_qns_m_init / a_c;
+rel_qns_init  = [0, 0, 0, 300, 0, 500]';
+TDX_oe_init = qns2oe(TSX_oe_init, rel_qns_init);
 
 % using GVEs cause they maintain numerical stability for longer
 
@@ -55,7 +52,7 @@ orbit_num = floor(t_orbit) + 1;
 [~, TDX_oe_gt] = ode4(@compute_rates_GVE_J2, [tstart,tend]', TDX_oe_init, dt);
 rel_oe_gt = zeros(num_points,6);
 for i = 1:num_points
-    rel_oe_gt(i,:) = compute_roes(TSX_oe_gt(i,:), TDX_oe_gt(i,:));
+    rel_oe_gt(i,:) = TSX_oe_gt(i,1)*compute_roes(TSX_oe_gt(i,:), TDX_oe_gt(i,:));
 end
 
 % Generate measurements (add noise to ground truth)
@@ -75,6 +72,7 @@ roe_meas = rel_oe_gt + noise_roe;
 % Set initial estimate and covariance
 TSX_x0 = TSX_rv_init + (sqrtm(sigma_rv) * randn(6, 1));
 x0 = rel_qns_init + (sqrtm(sigma_roe) * randn(6, 1));
+x0_unfiltered = rel_qns_init;
 P0 = sigma_rv;
 P0_roe = sigma_roe;
 
@@ -85,18 +83,49 @@ P0_roe = sigma_roe;
 % Define process and measurements noise covariances
 
 % base Q on the diff between STM and GVE
-Q = P0/1000;
+Q = P0/10;
 R = P0;
-Q_roe = P0_roe/1000;
-R_roe = P0_roe;
+Q_roe = 2 * P0_roe;
+R_roe = 1 * P0_roe;
 
 % delta lambda hardest to observe but if feeding the whole state there
 % shouldn't be drift
 
 
 % numerical propagation vs STM osculating (PSET 4)
+roe_unfiltered = zeros(num_points,6);
+roe_unfiltered(1,:) = x0_unfiltered;
+for i = 2:num_points
+    t = t_grid(i-1);
+    Phi = stm_qns_j2(dt, TSX_oe_gt(i-1,:));
+    x0_unfiltered = Phi * x0_unfiltered;
+    roe_unfiltered(i,:) = x0_unfiltered;
+end
 
+%——— Plot relative orbital elements ———%
+figure;
 
+% 1) Δa vs Δλ
+subplot(3,1,1);
+plot(rel_oe_gt(:,1),  rel_oe_gt(:,2),  'b-',  'LineWidth',1.5); hold on;
+plot(roe_unfiltered(:,1), roe_unfiltered(:,2), 'r--','LineWidth',1.5);
+xlabel('a\deltaa [m]'); ylabel('a\delta\lambda [m]');
+axis equal;
+legend('Ground truth','Unfiltered STM','Location','best');
+
+% 2) e_x vs e_y
+subplot(3,1,2);
+plot(rel_oe_gt(:,3),  rel_oe_gt(:,4),  'b-',  'LineWidth',1.5); hold on;
+plot(roe_unfiltered(:,3), roe_unfiltered(:,4), 'r--','LineWidth',1.5);
+xlabel('a\deltae_x [m]'); ylabel('a\deltae_y [m]');
+axis equal;
+
+% 3) i_x vs i_y
+subplot(3,1,3);
+plot(rel_oe_gt(:,5),  rel_oe_gt(:,6),  'b-',  'LineWidth',1.5); hold on;
+plot(roe_unfiltered(:,5), roe_unfiltered(:,6), 'r--','LineWidth',1.5);
+xlabel('a\deltai_x [m]'); ylabel('a\deltai_y [m]');
+axis equal;
 
 % Set up and propagate EKF
 TSX_rv_ekf = zeros(num_points, 6);
@@ -105,8 +134,6 @@ TSX_oe_ekf(1,:) = TSX_oe_init;
 TSX_rv_ekf(1,:) = TSX_x0;
 roe_ekf = zeros(num_points, 6);
 roe_ekf(1,:) = x0;
-roe_m_ekf = zeros(num_points, 6);
-roe_m_ekf = x0 * a_c; 
 TSX_x_k1k1 = TSX_x0;
 x_k1k1 = x0;
 P_TSX_hist = zeros(num_points,6,6);
@@ -129,7 +156,7 @@ for idx = 2:num_points
 
     % -------- PREDICT ---------
     % ROE STM propagation ---------
-    F = stm_qns_j2(t, TSX_oe);
+    F = stm_qns_j2(dt, TSX_oe);
     x_kk1 = F * x_k1k1;
     % ---------------------------------------
 
@@ -140,9 +167,7 @@ for idx = 2:num_points
     
     F_TSX = compute_F_j2(TSX_x_kk1); % This F is for continuous EKF, so next lines will be Pdot, not P
     Pdot_TSX_kk1 = F_TSX * P_TSX_k1k1 + P_TSX_k1k1 * F_TSX.' + Q;
-    %Pdot_kk1 = F * P_k1k1 * F.' + Q;
     P_kk1 = F * P_k1k1 * F.' + Q_roe;
-    %P_kk1 = P_k1k1 + Pdot_kk1 .* dt;
     P_TSX_kk1 = P_TSX_k1k1 + Pdot_TSX_kk1 .* dt;
 
     y = roe_meas(idx,:)' - x_kk1;
@@ -151,8 +176,6 @@ for idx = 2:num_points
     y_TSX_prefit(idx,:) = y_TSX';
 
     % -------- UPDATE --------
-    %y = roe_meas(idx,:)' - x_kk1;
-    %y_TSX = TSX_rv_meas(idx,:)' - TSX_x_kk1;
 
     % H should be from ROE to ECI
 
@@ -192,23 +215,23 @@ end
 state_labels_error = {'r_x error [m]','r_y error [m]','r_z error [m]','v_x error [m/s]','v_y error [m/s]','v_z error [m/s]'};
 roe_labels_error = {'a\deltaa error [m]','a\delta\lambda error [m]','a\deltae_x error [m]','a\deltae_y error [m/s]','a\deltai_x error [m/s]','a\deltai_y error [m/s]'};
 
-roe_labels = {'\deltaa','\delta\lambda','\deltae_x','\deltae_y','\deltai_x','\deltai_y'};
+roe_labels = {'a\deltaa [m]','a\delta\lambda [m]','a\deltae_x [m]','a\deltae_y [m]','a\deltai_x [m]','a\deltai_y [m]'};
 state_labels = {'r_x [m]','r_y [m]','r_z [m]','v_x [m/s]','v_y [m/s]','v_z [m/s]'};
 
 % --- Rel true vs. filtered ---
-roe_ekf_m = roe_ekf .* TSX_oe_gt(:,1);
-roe_oe_m = rel_oe_gt .* TSX_oe_gt(:, 1);
 figure;
 for idx = 1:6
     ax_rel(idx) = subplot(3,2,idx);
-    plot(t_orbit, roe_oe_m(:, idx),  'b-'); hold on;
-    plot(t_orbit, roe_ekf_m(:, idx), '--r');
+    plot(t_orbit, rel_oe_gt(:, idx),  'b-'); hold on;
+    plot(t_orbit, roe_ekf(:, idx), '--r');
+    plot(t_orbit, roe_unfiltered(:,idx), '-.');
     ylabel(roe_labels{idx});
-    if idx >= 5, xlabel('Time (s)'); end
+    if idx >= 5, xlabel('Orbit #'); end
     hold off;
 end
-legend(ax_rel(1), {'True','Filtered'}, 'Location','best');
-sgtitle('True vs. Filtered State Trajectories');
+% legend(ax_rel(1), {'True','Filtered'}, 'Location','best');
+legend(ax_rel(1), {'True','Filtered','Unfiltered'}, 'Location','best');
+%sgtitle('True vs. Filtered State Trajectories');
 
 % --- TSX true vs. filtered ---
 figure;
@@ -217,7 +240,7 @@ for idx = 1:6
     plot(t_orbit, TSX_rv_gt(:, idx),  'b-'); hold on;
     plot(t_orbit, TSX_rv_ekf(:, idx), '--r');
     ylabel(state_labels{idx});
-    if idx >= 5, xlabel('Time (s)'); end
+    if idx >= 5, xlabel('Orbit #'); end
     hold off;
 end
 legend(ax_tsx(1), {'True','Filtered'}, 'Location','best');
@@ -231,20 +254,20 @@ for idx = 1:6
     
     err    = roe_ekf(:,idx) - rel_oe_gt(:,idx);
     sigma1 = squeeze(sqrt( P_hist(:,idx,idx) ));
-    sigma2 = 2*sigma1;
+    sigma3 = 3*sigma1;
     
     h_err = plot(t_orbit, err);               % error
     h1    = plot(t_orbit, +sigma1, 'r--');          % +1σ
     plot(   t_orbit, -sigma1, 'r--');
-    h2    = plot(t_orbit, +sigma2,'m--');           % +2σ
-    plot(   t_orbit, -sigma2,'m--');              % –2σ
+    h2    = plot(t_orbit, +sigma3,'m--');           % +2σ
+    plot(   t_orbit, -sigma3,'m--');              % –2σ
     
     ylabel([roe_labels_error{idx}]);
     if idx>4, xlabel('Orbit #'); end
     
     if idx==1
       legend([h_err h1 h2], ...
-             'error','\pm1\sigma','\pm2\sigma', ...
+             'error','\pm1\sigma','\pm3\sigma', ...
              'Location','best');
     end
     
@@ -259,20 +282,20 @@ for idx = 1:6
     
     err    = TSX_rv_ekf(:,idx) - TSX_rv_gt(:,idx);
     sigma1 = squeeze(sqrt( P_TSX_hist(:,idx,idx) ));
-    sigma2 = 2*sigma1;
+    sigma3 = 3*sigma1;
     
     h_err = plot(t_orbit, err);               % error
     h1    = plot(t_orbit, +sigma1, 'r--');          % +1σ
     plot(   t_orbit, -sigma1, 'r--');
-    h2    = plot(t_orbit, +sigma2,'m--');           % +2σ
-    plot(   t_orbit, -sigma2,'m--');              % –2σ
+    h2    = plot(t_orbit, +sigma3,'m--');           % +2σ
+    plot(   t_orbit, -sigma3,'m--');              % –2σ
     
     ylabel([state_labels_error{idx}]);
     if idx>4, xlabel('Orbit #'); end
     
     if idx==1
       legend([h_err h1 h2], ...
-             'error','\pm1\sigma','\pm2\sigma', ...
+             'error','\pm1\sigma','\pm3\sigma', ...
              'Location','best');
     end
     
@@ -290,10 +313,10 @@ mean_TSX = mean( err_TSX(last_orbit_idx,:), 1 );
 std_rel  =   std( err_rel(last_orbit_idx,:),  0,1 ); % 1×6
 std_TSX  =   std( err_TSX(last_orbit_idx,:),  0,1 );
 
-fprintf('\nrel steady‐state error over last orbit:\n');
+fprintf('\nRel steady‐state error over last orbit:\n');
 for i=1:6
     fprintf('  %s:   mean = %+8.3e   std = %8.3e\n', ...
-            state_labels{i}, mean_rel(i), std_rel(i));
+            roe_labels{i}, mean_rel(i), std_rel(i));
 end
 
 fprintf('\nTSX steady‐state error over last orbit:\n');
