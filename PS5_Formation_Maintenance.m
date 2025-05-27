@@ -87,8 +87,8 @@ TDX_RTN_cur   = TDX_init_rtn;
 a_chief      = a_TSX_init;
 roe_nom      = (rel_qns_post') ./ a_chief;     % desired normalized ROE
 
-delta_de_max = 5 / a_chief;
-delta_di_max = 5 / a_chief;
+delta_de_max = 0.5 / a_chief;
+delta_di_max = 0.5 / a_chief;
 
 dphi = asin(delta_de_max / norm(roe_nom(3:4)));
 de_des = [roe_nom(3)*cos(dphi) - roe_nom(4)*sin(dphi);
@@ -98,6 +98,7 @@ dv_times = [];
 dv_vals  = [];
 dv_hist  = zeros(3, num_points);
 
+
 %% Main propagation + control loop
 for idx = 2:num_points
     t_cur  = t_grid(idx-1);
@@ -105,34 +106,50 @@ for idx = 2:num_points
     
     % 1) Compute current normalized ROE
     roe_cur = compute_roes(TSX_oe_hist(idx-1,:), TDX_oe_hist(idx-1,:));
+
     
     % 2) Detect e-plane drift
     if isempty(dv_vals) && norm(roe_cur(3:4) - roe_nom(3:4)) > delta_de_max
         roe_des       = roe_nom;
         roe_des(3:4) = de_des;
-        t_imp = linspace(t_cur, t_cur+T, 5);
+        t_imp = linspace(t_cur, t_cur+T, 2);
         t_imp = t_imp(2:end);
-        delta_v_seq = naive_least_squares( ...
+        
+
+        
+        fprintf('  t_imp    = [%.1f] s  (should be in [%.1f, %.1f])\n', ...
+                t_imp(1),  t_cur, t_cur+T);
+
+
+
+        dv_seq = naive_least_squares( ...
             t_imp, roe_cur, roe_des, ...
             TSX_oe_hist(idx-1,:), wrapTo2Pi(TSX_oe_hist(idx-1,5)+TSX_oe_hist(idx-1,6)), ...
             t_cur, t_cur+T);
-        dv_times = arrayfun(@(t)find(abs(t_grid-t)==min(abs(t_grid-t)),1), t_imp);
-        dv_vals  = delta_v_seq;
+        delta_v_idxs_sk = zeros(size(t_imp));
+        for j = 1:length(t_imp)
+            [~, delta_v_idxs_sk(j)] = min(abs(t_grid - t_imp(j)));
+        end
+        dv_times = [dv_times; delta_v_idxs_sk];
+        dv_vals = [dv_vals; dv_seq];
     end
     
     % 3) Detect i-plane drift
     if isempty(dv_vals) && norm(roe_cur(5:6) - roe_nom(5:6)) > delta_di_max
         roe_des       = roe_nom;
-        roe_des(5:6)= roe_nom(5:6) - delta_di_max*sign(roe_cur(5));
-        t_imp = linspace(t_cur, t_cur+T, 3);
+        roe_des(5:6)= [roe_nom(5); roe_nom(6) - sign(roe_cur(5))*delta_di_max];
+        t_imp = linspace(t_cur, t_cur+T, 2);
         t_imp = t_imp(2:end);
-        delta_v_seq = naive_least_squares( ...
+        dv_seq = naive_least_squares( ...
             t_imp, roe_cur, roe_des, ...
             TSX_oe_hist(idx-1,:), wrapTo2Pi(TSX_oe_hist(idx-1,5)+TSX_oe_hist(idx-1,6)), ...
             t_cur, t_cur+T);
-        dv_times = arrayfun(@(t)find(abs(t_grid-t)==min(abs(t_grid-t)),1), t_imp);
-        dv_vals  = delta_v_seq;
+        new_times = arrayfun(@(t)find(abs(t_grid-t)==min(abs(t_grid-t)),1), t_imp);
+        dv_times = [dv_times; new_times];
+        dv_vals = [dv_vals; dv_seq];
     end
+
+
 
     hit = find(dv_times==idx,1);
     if ~isempty(hit)
@@ -167,11 +184,12 @@ for idx = 2:num_points
     % 7) Prepare for next iteration
     TSX_ECI_cur = TSX_ECI_next;
     TDX_ECI_cur = TDX_ECI_next;
+    state_out(idx, :) = [TDX_RTN_next; TSX_ECI_next];
 end
 
 %% Plotting results
 % RTN projections
-guidata = rel_oe_hist;  % rename for clarity
+guidata = state_out;  % rename for clarity
 figure; subplot(1,3,1); plot(guidata(:,2), guidata(:,1)); axis equal; grid on;
 xlabel('r_T [m]'); ylabel('r_R [m]'); title('TR plane');
 subplot(1,3,2); plot(guidata(:,3), guidata(:,1)); axis equal; grid on;
@@ -193,3 +211,5 @@ figure; plot(t_orbit, cum_dv); grid on;
 xlabel('Orbit Number'); ylabel('Cumulative Δv [m/s]');
 total_dv = cum_dv(end);
 fprintf('Total Δv = %.3f m/s\n', total_dv);
+
+

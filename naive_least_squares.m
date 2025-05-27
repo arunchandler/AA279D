@@ -14,9 +14,10 @@ function delta_v_vals = naive_least_squares( ...
     % build the big 6×(3m) matrix
     Matrix_block = zeros(6, 3*m);
     for i = 1:m
-        t_i   = t_maneuvers(i);
-        STM_if = calc_STM_for_control(t_i, t_final, SV1_oe_init);
-        Gamma_i = calc_Gamma_for_control(t_i, SV1_oe_init, u_SV1_init);
+        t_abs   = t_maneuvers(i);
+        dt_i    = t_abs - t_0; 
+        STM_if = calc_STM_for_control(t_abs, t_final, SV1_oe_init);
+        Gamma_i = calc_Gamma_for_control(t_abs, SV1_oe_init, u_SV1_init);
         Matrix_block(:, 3*(i-1)+1 : 3*i) = STM_if * Gamma_i;
     end
 

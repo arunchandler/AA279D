@@ -33,10 +33,6 @@ TDX_oe_init = qns2oe(TSX_oe_init, rel_qns_m_init);
 a_c = TSX_oe_init(1);
 rel_qns_init = rel_qns_m_init / a_c;
 
-% using GVEs cause they maintain numerical stability for longer
-
-
-% do one and three sigma 
 % timing parameters
 tstart     = 0.0;
 n          = sqrt(mu/a_TSX_init^3);
@@ -78,25 +74,11 @@ x0 = rel_qns_init + (sqrtm(sigma_roe) * randn(6, 1));
 P0 = sigma_rv;
 P0_roe = sigma_roe;
 
-% use differences in RTN as measurements and convert that to ROE
-% Error should not leave the covariance bounds, which means we are
-% confident
-
 % Define process and measurements noise covariances
-
-% base Q on the diff between STM and GVE
-Q = P0/1000;
+Q = P0;
 R = P0;
-Q_roe = P0_roe/1000;
+Q_roe = P0_roe;
 R_roe = P0_roe;
-
-% delta lambda hardest to observe but if feeding the whole state there
-% shouldn't be drift
-
-
-% numerical propagation vs STM osculating (PSET 4)
-
-
 
 % Set up and propagate EKF
 TSX_rv_ekf = zeros(num_points, 6);
@@ -130,19 +112,19 @@ for idx = 2:num_points
     % -------- PREDICT ---------
     % ROE STM propagation ---------
     F = stm_qns_j2(t, TSX_oe);
-    x_kk1 = F * x_k1k1;
+    x_kk1 = F * x_k1k1 + (sqrtm(sigma_roe) * randn(6, 1));
     % ---------------------------------------
 
     % TSX ode propagation ----------
     [~, TSX_x_kk1] = ode4(@compute_rates_rv_perturbed, [t,t_next]', TSX_x_k1k1, dt);
-    TSX_x_kk1 = TSX_x_kk1(2,:)';
+    TSX_x_kk1 = TSX_x_kk1(2,:)' + (sqrtm(sigma_rv) * randn(6, 1));
     % ----------------------------------------
-    
+
     F_TSX = compute_F_j2(TSX_x_kk1); % This F is for continuous EKF, so next lines will be Pdot, not P
     Pdot_TSX_kk1 = F_TSX * P_TSX_k1k1 + P_TSX_k1k1 * F_TSX.' + Q;
-    %Pdot_kk1 = F * P_k1k1 * F.' + Q;
-    P_kk1 = F * P_k1k1 * F.' + Q_roe;
-    %P_kk1 = P_k1k1 + Pdot_kk1 .* dt;
+    Pdot_kk1 = F * P_k1k1 + P_k1k1 * F.' + Q;
+    % P_kk1 = F * P_k1k1 * F.' + Q_roe;
+    P_kk1 = P_k1k1 + Pdot_kk1 .* dt;
     P_TSX_kk1 = P_TSX_k1k1 + Pdot_TSX_kk1 .* dt;
 
     y = roe_meas(idx,:)' - x_kk1;
@@ -153,8 +135,6 @@ for idx = 2:num_points
     % -------- UPDATE --------
     %y = roe_meas(idx,:)' - x_kk1;
     %y_TSX = TSX_rv_meas(idx,:)' - TSX_x_kk1;
-
-    % H should be from ROE to ECI
 
     H = eye(6);
     S = H * P_kk1 * H.' + R_roe;
@@ -196,13 +176,12 @@ roe_labels = {'\deltaa','\delta\lambda','\deltae_x','\deltae_y','\deltai_x','\de
 state_labels = {'r_x [m]','r_y [m]','r_z [m]','v_x [m/s]','v_y [m/s]','v_z [m/s]'};
 
 % --- Rel true vs. filtered ---
-roe_ekf_m = roe_ekf .* TSX_oe_gt(:,1);
-roe_oe_m = rel_oe_gt .* TSX_oe_gt(:, 1);
+%roe_ekf_m = roe_ekf * TSX_oe(1);
 figure;
 for idx = 1:6
     ax_rel(idx) = subplot(3,2,idx);
-    plot(t_orbit, roe_oe_m(:, idx),  'b-'); hold on;
-    plot(t_orbit, roe_ekf_m(:, idx), '--r');
+    plot(t_orbit, rel_oe_gt(:, idx),  'b-'); hold on;
+    plot(t_orbit, roe_ekf(:, idx), '--r');
     ylabel(roe_labels{idx});
     if idx >= 5, xlabel('Time (s)'); end
     hold off;

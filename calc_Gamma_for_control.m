@@ -1,4 +1,4 @@
-function Gamma = calc_Gamma_for_control(t_man, SV1_oe_init, u_SV1_init)
+function Gamma = calc_Gamma_for_control(delt, SV1_oe_init, u_SV1_init)
     global J2 Re mu
 
     a     = SV1_oe_init(1);
@@ -12,7 +12,7 @@ function Gamma = calc_Gamma_for_control(t_man, SV1_oe_init, u_SV1_init)
     n     = sqrt(mu/a^3);
 
     % argument of latitude in radians (u_SV1_init must already be rad)
-    u = t_man*(n + kappa*(eta*(3*cos(i_rad)^2-1) + (5*cos(i_rad)^2-1))) ...
+    u = delt*(n + kappa*(eta*(3*cos(i_rad)^2-1) + (5*cos(i_rad)^2-1))) ...
         + u_SV1_init;
 
     % each row = 1×3, so Gamma is 6×3
