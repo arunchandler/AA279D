@@ -206,7 +206,7 @@ for idx = 2:num_points
     P_TSX_k1k1 = P_TSX_kk;
 
     TSX_params = rv2oe(TSX_x_kk, mu);
-    TSX_oe = [TSX_params(1:5), true2mean(TSX_params(6), TSX_params(2))];
+    TSX_oe = osc2mean([TSX_params(1:5), true2mean(TSX_params(6), TSX_params(2))]);
 
 
 end
