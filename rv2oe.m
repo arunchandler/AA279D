@@ -79,7 +79,7 @@ function params = rv2oe(X, mu)
     nu   = wrapTo2Pi(nu);
 
     % build output
-    h_pf = h_vec.';                              % [h_x h_y h_z]
+    h_pf = h_vec;                              % [h_x h_y h_z]
     e_pf = [e*cos(omega), e*sin(omega)];         % eccentricity in perifocal
 
     params = [a, e, i, RAAN, omega, nu, energy, h_pf, e_pf];
