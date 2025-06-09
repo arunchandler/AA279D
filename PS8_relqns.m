@@ -2,15 +2,18 @@ clc; clear; close all;
 addpath('mean_osc');
 format long g;
 
-global tol Re J2 mu s_d sigma_pos sigma_vel sigma_qns
+global tol Re J2 mu s_d sigma_pos sigma_vel sigma_qns_a sigma_qns_lam sigma_qns_e sigma_qns_i
 tol = 1e-10;
 Re  = 6378137;          % m
 J2  = 1.082626e-3;
 mu  = 3.986004418e14;   % m^3/s^2
 s_d = 86400;            % s/day
 sigma_pos = 1;
-sigma_vel = 0.001;
-sigma_qns = 1e-4;
+sigma_vel = 0.005;
+sigma_qns_a = 3; 
+sigma_qns_lam = 10;
+sigma_qns_e = 5; 
+sigma_qns_i = 5; 
 
 % initial cheif elements & state
 a_TSX_init    = 6886536.686;  % m
@@ -36,14 +39,16 @@ TDX_rv_init = oe2rv(TDX_oe_init, mu);
 % timing parameters
 tstart     = 0.0;
 n          = sqrt(mu/a_TSX_init^3);
+disp(n)
 T          = 2*pi/n;
-n_orbit    = 15;
+n_orbit    = 5;
 tend       = n_orbit*T;
 num_points = 1000;
 dt         = (tend - tstart)/(num_points-1);
 t_grid     = linspace(tstart, tend, num_points).';
 t_orbit    = t_grid / T;
 orbit_num = floor(t_orbit) + 1;
+disp(dt)
 
 % Generate ground truth
 [~, TSX_rv_gt] = ode4(@compute_rates_rv_perturbed, [tstart,tend]', TSX_rv_init, dt);
@@ -59,13 +64,15 @@ end
 sigma_rv = diag([sigma_pos^2*ones(3,1);
                   sigma_vel^2*ones(3,1)]);
 
-sigma_roe = diag([sigma_qns^2*ones(6,1)]);
+sigma_roe_init = diag([sigma_qns_a^2, sigma_qns_lam^2, sigma_qns_e^2, sigma_qns_e^2, sigma_qns_i^2, sigma_qns_i^2]);
+
+sigma_roe_meas = diag([0.5^2 5^2 1^2 1^2 0.5^2 0.5^2]); 
 
 N = length(t_grid);
 
 noise_TSX = (sqrtm(sigma_rv) * randn(6, N))';
 noise_TDX = (sqrtm(sigma_rv) * randn(6, N))';
-noise_roe = (sqrtm(sigma_roe) * randn(6, N))';
+noise_roe = (sqrtm(sigma_roe_meas) * randn(6, N))';
 
 TSX_rv_meas = TSX_rv_gt + noise_TSX;
 TDX_rv_meas = TDX_rv_gt + noise_TDX;
@@ -73,10 +80,10 @@ roe_meas = rel_oe_gt + noise_roe;
 
 % Set initial estimate and covariance
 TSX_x0 = TSX_rv_init + (sqrtm(sigma_rv) * randn(6, 1));
-x0 = rel_qns_init + (sqrtm(sigma_roe) * randn(6, 1));
+x0 = rel_qns_init + (sqrtm(sigma_roe_meas) * randn(6, 1));
 x0_unfiltered = rel_qns_init;
 P0 = sigma_rv;
-P0_roe = sigma_roe;
+P0_roe = sigma_roe_init;
 
 % use differences in RTN as measurements and convert that to ROE
 % Error should not leave the covariance bounds, which means we are
@@ -86,10 +93,17 @@ P0_roe = sigma_roe;
 
 % base Q on the diff between STM and GVE
 Q = P0/10;
-R = P0;
-Q_roe = 2 * P0_roe;
+% measurement covariances
+R      = diag([2^2*ones(3,1); (0.02)^2*ones(3,1)]);  % absolute GPS
+
+% process noise (ROE)
+
+n   = sqrt(mu/a_TSX_init^3);
+sigma_a_t = 2.5e-4;                      % 40 µm/s²  ← tuned
+Q_roe = 100*(sigma_a_t^2 / n^2) * diag([4 4 2 2 1 1]) * dt;
 R_roe = P0_roe;
 
+disp(Q_roe/R_roe)
 % delta lambda hardest to observe but if feeding the whole state there
 % shouldn't be drift
 
@@ -148,6 +162,8 @@ resid_TSX_prefit   = zeros(num_points,6);
 resid_TSX_postfit  = zeros(num_points,6);
 resid_prefit   = zeros(num_points,6);
 resid_postfit  = zeros(num_points,6);
+NIS = zeros(num_points, 1);
+NEES = zeros(num_points, 1); 
 
 TSX_oe = TSX_oe_init;
 
@@ -187,6 +203,7 @@ for idx = 2:num_points
     S_TSX = H * P_TSX_kk1 * H.' + R;
 
     K = P_kk1 * H.' * inv(S);
+    %disp(diag(K));
     K_TSX = P_TSX_kk1 * H.' * inv(S_TSX);
     
     x_kk = x_kk1 + K * y;
@@ -201,6 +218,19 @@ for idx = 2:num_points
     resid_TSX_postfit(idx,:) = (TSX_rv_meas(idx,:)' - TSX_x_kk)';
 
     % Store state and update P and x
+
+    nu  = resid_prefit(idx,:)';      % innovation r_k
+    NIS(idx)  = nu.' / S * nu;       % χ²(6) should lie in [1.6,14.4] 95 %
+    e   = x_kk - rel_oe_gt(idx,:)';
+    NEES(idx) = e.'  / P_kk * e;   % χ²(6) should lie in [0.9,16.8] 95 %
+    % print a header once per iteration (optional)
+    %fprintf('--- Step %d ---\n', idx);
+
+    % now print NIS and NEES with the values
+    %fprintf('NIS = %+8.3e   NEES = %8.3e\n', ...
+           % NIS(idx), NEES(idx));
+
+
     roe_ekf(idx,:) = x_kk;
     TSX_rv_ekf(idx,:) = TSX_x_kk;
     x_k1k1 = x_kk;
@@ -225,15 +255,33 @@ state_labels = {'r_x [m]','r_y [m]','r_z [m]','v_x [m/s]','v_y [m/s]','v_z [m/s]
 figure;
 for idx = 1:6
     ax_rel(idx) = subplot(3,2,idx);
-    plot(t_orbit, rel_oe_gt(:, idx),  'b-'); hold on;
-    plot(t_orbit, roe_ekf(:, idx), '--r');
-    plot(t_orbit, roe_unfiltered(:,idx), '-.');
+    hold on;
+
+    % time, truth, estimate, and 1σ
+    t     = t_orbit;
+    truth = rel_oe_gt(:,idx);
+    est   = roe_ekf(:,idx);
+    sigma = sqrt( squeeze( P_hist(:,idx,idx) ) );
+
+    % build the closed‐loop for shading (est+σ then est–σ)
+    x2       = [t; flipud(t)];
+    band1    = [ est + sigma; flipud(est - sigma) ];
+    fill(x2, band1, [1 0.6 0.6], ...
+         'EdgeColor','none','FaceAlpha',0.4);
+
+    % now plot truth and filtered mean on top
+    plot(t, truth, 'b-', 'LineWidth', 1.5);
+    plot(t, est,   '--r', 'LineWidth', 1.5);
+
     ylabel(roe_labels{idx});
     if idx >= 5, xlabel('Orbit #'); end
+
     hold off;
 end
-% legend(ax_rel(1), {'True','Filtered'}, 'Location','best');
-legend(ax_rel(1), {'True','Filtered','Unfiltered'}, 'Location','best');
+
+% legend only needs to go on the first subplot
+legend(ax_rel(1), {'±1σ bound','True','Filtered'}, 'Location','best');
+%legend(ax_rel(1), {'True','Filtered','Unfiltered'}, 'Location','best');
 %sgtitle('True vs. Filtered State Trajectories');
 
 % --- TSX true vs. filtered ---
@@ -354,3 +402,8 @@ for i = 1:6
 end
 % one legend on the first subplot only:
 legend(ax_tsx(1), {'prefit','injected noise','postfit'}, 'Location','best');
+
+avg_NEES = mean(NEES);
+
+% Print it
+fprintf('\nAverage NEES over all steps: %8.3e\n', avg_NEES);
