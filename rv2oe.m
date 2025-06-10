@@ -37,7 +37,7 @@ function params = rv2oe(X, mu)
     e_vec = (1/mu)*((v_norm^2 - mu/r_norm)*r - dot(r,v)*v);
     e = norm(e_vec);
 
-    % if it’s supposed to be elliptical but numerics pushed e>1
+    % if it's supposed to be elliptical but numerics pushed e>1
     tol_e = 1e-10;
     if e>1 && e<1+tol_e
         e = 1;
@@ -79,7 +79,7 @@ function params = rv2oe(X, mu)
     nu   = wrapTo2Pi(nu);
 
     % build output
-    h_pf = h_vec;                              % [h_x h_y h_z]
+    h_pf = h_vec(:)';                              % [h_x h_y h_z] as row vector
     e_pf = [e*cos(omega), e*sin(omega)];         % eccentricity in perifocal
 
     params = [a, e, i, RAAN, omega, nu, energy, h_pf, e_pf];
