@@ -44,6 +44,9 @@ i_c       = i_TSX;
 lambda_nom_hat = roe_tgt(2)/a_chief;
 u_nom_hat = lambda_nom_hat - (i_nom_hat(2))*cot(i_c);
 
+% Fix tolerance to be smaller than the error thresholds
+tol_maneuver = 1e-10;  % Much smaller than the error thresholds
+
 %% ---------- state arrays ----------
 N    = numel(t_grid);
 TSX  = zeros(N,6);    TSX(1,:) = TSX_init;
@@ -57,13 +60,13 @@ pending  = [];                     % burn queue
 burn_t   = []; burn_dv=[]; burn_vecs=[];
 cum_dv   = 0;
 maneuver_log = [];
-cooldown = T;                      % 1-orbit cool-down
+cooldown = 2*T;                    % 2-orbit cool-down (increased from 1)
 last_plan= -Inf;
 use_N    = true;                   % permit normal burn?
 
 % ---- queue helper ----
 next_burn = @(u_tgt,u_now,t_now,nbar) ...
-            t_now + mod(wrapToPi(u_tgt-u_now),2*pi)/nbar;
+            find_next_burn_time(u_tgt, u_now, t_now, nbar);
 
 J = 2;                       % how many samples before & after to print
 watch = false(N,1);          % logical vector, all false to start
@@ -79,14 +82,21 @@ for k = 2:N
 
     %-------------------------------------------------- 2. execute queued burns
     while ~isempty(pending) && pending(1).t <= t_cur+1e-9
-        tburn = pending(1).t;  dv_vec = pending(1).dv;  label=pending(1).tag;
+        tburn = pending(1).t;  dv_rtn = pending(1).dv_rtn;  label=pending(1).tag;
 
         % rewind to burn, kick, propagate rest of step
         [~,c_tmp]=ode4(@compute_rates_GVE_J2,[t_prev tburn]',chief',dt/10);
         [~,d_tmp]=ode4(@compute_rates_GVE_J2,[t_prev tburn]',dep'  ,dt/10);
         chief = vrow(c_tmp(end,:));    dep = vrow(d_tmp(end,:));
         roe_before = a_chief * compute_roes(chief,dep)';
-        dep   = vrow(kick(dep,dv_vec));
+        
+        % Convert RTN to ECI at burn time using current deputy state
+        rv_dep = oe2rv(dep, mu);
+        r_dep = rv_dep(1:3);
+        v_dep = rv_dep(4:6);
+        dv_eci = dv_RTN2ECI(r_dep, v_dep, dv_rtn);
+        
+        dep   = vrow(kick(dep,dv_eci));
         roe_after  = a_chief * compute_roes(chief,dep)';     % just after kick
         dR = roe_after - roe_before;
         
@@ -99,19 +109,19 @@ for k = 2:N
 
         % -- bookkeeping
         burn_t   = [burn_t; tburn];
-        burn_dv  = [burn_dv; norm(dv_vec)];
-        burn_vecs= [burn_vecs; get_rtn_components(dep,dv_vec)];
-        cum_dv   = cum_dv + norm(dv_vec);
+        burn_dv  = [burn_dv; norm(dv_eci)];
+        burn_vecs= [burn_vecs; get_rtn_components(dep,dv_eci)];
+        cum_dv   = cum_dv + norm(dv_eci);
 
         fprintf('Executed %s burn  t=%9.1f s  |Δv|=%6.2f mm/s\n',...
-                label,tburn,norm(dv_vec)*1e3);
+                label,tburn,norm(dv_eci)*1e3);
 
         pending(1)=[];   t_prev = tburn;   % popped & time shifted
     end
 
     %-------------------------------------------------- 3. store grid sample
-    TSX(k,:) = chief;  TSX(k,6)=wrap(TSX(k,6));
-    TDX(k,:) = dep;    TDX(k,6)=wrap(TDX(k,6));
+    TSX(k,:) = chief;  TSX(k,6)=wrapTo2Pi(TSX(k,6));
+    TDX(k,:) = dep;    TDX(k,6)=wrapTo2Pi(TDX(k,6));
     rel(k,:) = a_chief*compute_roes(chief,dep)';
     if watch(k) && k>1
         dROE = rel(k,:) - rel(k-1,:);
@@ -127,7 +137,7 @@ for k = 2:N
         di_err  = norm(di_hat-i_nom_hat);
     
         % Add small tolerance to avoid floating point issues
-        tol_maneuver = 1e-12;  % Much smaller than your thresholds
+        tol_maneuver = 1e-10;  % Much smaller than the error thresholds
         need_e_maneuver = de_err > (de_max + tol_maneuver);
         need_i_maneuver = di_err > (di_max + tol_maneuver);
     
@@ -146,7 +156,7 @@ for k = 2:N
             nbar = n+kappa*(eta*P+Q);
     
             % -------- current argument of latitude --------
-            u_c  = wrap( mean2true(chief(6),chief(2),tol)+chief(5) );
+            u_c  = wrapTo2Pi( mean2true(chief(6),chief(2),tol)+chief(5) );
     
             % Initialize burn queue for this maneuver cycle
             new_burns = [];
@@ -164,40 +174,24 @@ for k = 2:N
                 fprintf('Rotation angle: %.2f deg\n', rad2deg(dphi));
             
                 % burn epochs
-                uM1  = wrap(atan2(de_req(2),de_req(1)));
-                uM2  = wrap(uM1+pi);
+                uM1  = wrapTo2Pi(atan2(de_req(2),de_req(1)));
+                uM2  = wrapTo2Pi(uM1+pi);
                 t1   = next_burn(uM1,u_c,t_cur,nbar);
                 t2   = next_burn(uM2,u_c,t_cur,nbar);
             
-                % Δv magnitudes
-                nu_d = mean2true(dep(6),dep(2),tol);
-                u_d  = wrap(nu_d+dep(5));
-                delta_u = wrapToPi(u_d-u_c);
-            
-                Delta_t = 1*T;
-                du_J2 = -12*gamma*sin(2*chief(3))*di_hat(1)*n*Delta_t;
-                da_man = -pi/(2*n*Delta_t-pi) * ...
-                         (3*de_max+roe_hat(1) - (4/(3*pi))*(delta_u-u_nom_hat+du_J2));
-            
-                dvt1 = n*a_chief/4*((da_man-roe_hat(1))+norm(de_req));
-                dvt2 = -dvt1;
-            
-                % FIXED: Convert RTN to ECI properly
-                rv_dep = oe2rv(dep, mu);
-                r_dep = rv_dep(1:3);
-                v_dep = rv_dep(4:6);
+                % Δv magnitudes - simplified Damico maneuver
+                dvt1 = n*a_chief/4 * norm(de_req);
+                dvt2 = -dvt1;  % Opposite burn for eccentricity control
                 
-                % Create RTN delta-v vectors and convert to ECI
-                dv_t1_RTN = [0; dvt1; 0];  % Pure tangential burn
-                dv_t2_RTN = [0; dvt2; 0];  % Opposite tangential burn
-                
-                dv_t1_ECI = dv_RTN2ECI(r_dep, v_dep, dv_t1_RTN);
-                dv_t2_ECI = dv_RTN2ECI(r_dep, v_dep, dv_t2_RTN);
+                % Add numerical bounds checking
+                max_dv = 0.1;  % Maximum 10 cm/s per burn
+                dvt1 = sign(dvt1) * min(abs(dvt1), max_dv);
+                dvt2 = sign(dvt2) * min(abs(dvt2), max_dv);
             
-                % Add to burn queue
+                % Store RTN components for later conversion at burn time
                 new_burns = [new_burns;
-                            struct('t',t1,'dv',dv_t1_ECI,'tag','T1');
-                            struct('t',t2,'dv',dv_t2_ECI,'tag','T2')];
+                            struct('t',t1,'dv_rtn',[0; dvt1; 0],'tag','T1');
+                            struct('t',t2,'dv_rtn',[0; dvt2; 0],'tag','T2')];
                 
                 fprintf('Planned eccentricity maneuvers: T1 at t=%.1f, T2 at t=%.1f\n', t1, t2);
             end
@@ -211,22 +205,17 @@ for k = 2:N
                 fprintf('Current i-vector: [%.6f, %.6f] (dimensionless)\n', di_hat(1), di_hat(2));
                 fprintf('Target i-vector:  [%.6f, %.6f] (dimensionless)\n', di_man(1), di_man(2));
             
-                uN = wrap(atan2(di_req(2),di_req(1)));
+                uN = wrapTo2Pi(atan2(di_req(2),di_req(1)));
                 tn = next_burn(uN,u_c,t_cur,nbar);
                 dvn = n*a_chief*norm(di_req);
-            
-                % FIXED: Convert RTN to ECI properly for inclination maneuver
-                rv_dep = oe2rv(dep, mu);
-                r_dep = rv_dep(1:3);
-                v_dep = rv_dep(4:6);
                 
-                % Create RTN delta-v vector and convert to ECI
-                dv_n_RTN = [0; 0; dvn];  % Pure normal burn
-                dv_n_ECI = dv_RTN2ECI(r_dep, v_dep, dv_n_RTN);
+                % Add numerical bounds checking for inclination maneuver
+                max_dv_n = 0.1;  % Maximum 10 cm/s per burn
+                dvn = sign(dvn) * min(abs(dvn), max_dv_n);
             
-                % Add to burn queue
+                % Store RTN components for later conversion at burn time
                 new_burns = [new_burns;
-                            struct('t',tn,'dv',dv_n_ECI,'tag','N')];
+                            struct('t',tn,'dv_rtn',[0; 0; dvn],'tag','N')];
                 
                 fprintf('Planned inclination maneuever: N at t=%.1f\n', tn);
             end
@@ -314,6 +303,24 @@ if ~isempty(maneuver_log)
 end
 
 %% Helper Functions
+
+function t_burn = find_next_burn_time(u_tgt, u_now, t_now, nbar)
+    % Find the next time when the satellite reaches the target argument of latitude
+    % Uses a search structure similar to damico_maneuvers function
+    k = 0;
+    t_burn = -100;
+    
+    while t_burn < t_now
+        u_target = u_tgt + k*2*pi;  % Add full revolutions to find next occurrence
+        t_burn = t_now + (u_target - u_now)/nbar;
+        k = k + 1;
+        
+        % Safety check to prevent infinite loops
+        if k > 100
+            error('Could not find valid burn time within 100 revolutions');
+        end
+    end
+end
 
 function dirECI = rtn_axis(oeChief, oeDep, which)
     global mu tol
