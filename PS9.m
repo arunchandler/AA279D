@@ -132,6 +132,7 @@ sigma_roe_meas = diag([0.5^2 5^2 1^2 1^2 0.5^2 0.5^2]);
 
 noise_roe = (sqrtm(sigma_roe_meas) * randn(6, N))';
 noise_TSX = (sqrtm(sigma_rv) * randn(6, N))';
+noise_TDX = (sqrtm(sigma_rv) * randn(6, N))';
 
 for idx = 2:num_points
 
@@ -191,11 +192,11 @@ for idx = 2:num_points
     [TDX_ECI_cur, ~] = rtn2eci(TSX_ECI_cur, TDX_RTN_cur);
 
     [t_out, TDX_ECI_next] = ode4(@compute_rates_rv_perturbed, [t_cur, t_next]', TDX_ECI_cur,  dt);
-    % TDX_ECI_next = TDX_ECI_next(2,:)' + (sqrtm(sigma_rv) * randn(6, 1));
+    % TDX_ECI_next = TDX_ECI_next(2,:)' + noise_TDX(idx,:)';
     TDX_ECI_next = TDX_ECI_next(2,:)';
 
     [t_out, TSX_ECI_next] = ode4(@compute_rates_rv_perturbed, [t_cur, t_next]', TSX_ECI_cur,  dt);
-    % TSX_ECI_next = TSX_ECI_next(2,:)' + (sqrtm(sigma_rv) * randn(6, 1));
+    % TSX_ECI_next = TSX_ECI_next(2,:)' + noise_TSX(idx,:)';
     TSX_ECI_next = TSX_ECI_next(2,:)';
 
     TSX_ECI_hist(idx,:) = TSX_ECI_next'; 
@@ -215,8 +216,7 @@ for idx = 2:num_points
     TDX_oe_next(3:6) = wrapTo2Pi(TDX_oe_next(3:6));
     TDX_oe(idx,:) = TDX_oe_next;
 
-    % rel_oe_next = TSX_oe_next(1)*compute_roes(TSX_oe_next, TDX_oe_next)' + ...
-                  (sqrtm(sigma_roe_meas) * randn(6, 1))';
+    % rel_oe_next = TSX_oe_next(1)*compute_roes(TSX_oe_next, TDX_oe_next)' + noise_roe(idx,:);
     rel_oe_next = TSX_oe_next(1)*compute_roes(TSX_oe_next, TDX_oe_next)';
     rel_oe(idx,:) = rel_oe_next;
 
@@ -359,94 +359,25 @@ ylabel('Acceleration magnitude (m/s^2)')
 %title('Control vs Argument of Latitude (no wrap)')
 grid on
 
-phi_unw = unwrap(phi_hist);
-figure
-plot(phi_unw, a_hist)
-xlabel('Unwrapped Argument of Latitude \phi (rad)')
-ylabel('Acceleration magnitude (m/s^2)')
-%title('Control vs Unwrapped Argument of Latitude')
-grid on
-
 % cumulative delta-v
-cum_dv_r = cumsum(abs(dv_hist(1,:)));
-cum_dv_t = cumsum(abs(dv_hist(2,:)));
-cum_dv_n = cumsum(abs(dv_hist(3,:)));
-cum_dv = cum_dv_r + cum_dv_t + cum_dv_n;
-total_dv = sum(abs(dv_hist(:)));  
+dv_mag  = sqrt( dv_hist(1,:).^2 + dv_hist(2,:).^2 + dv_hist(3,:).^2 );
+cum_dv   = cumsum( dv_mag );
+total_dv = cum_dv(end);
 fprintf('Total Δv = %.3f m/s\n', total_dv);
 figure;
-total_dv = sum(cum_dv);
 plot(t_orbit, cum_dv);
 xlabel('Orbit Number'); ylabel('Cumulative Delta-v (m/s)');
 %title('Cumulative Delta-v');
 
-%plotting absolute orbital elements
-figure;
-subplot(3,2,1)
-plot(t_orbit, TSX_oe(:,1)); grid on;
-xlabel('Orbits'); ylabel('a [m]')
-title('Semi–major axis')
-
-subplot(3,2,2)
-plot(t_orbit, TSX_oe(:,2)); grid on;
-xlabel('Orbits'); ylabel('e')
-title('Eccentricity')
-
-subplot(3,2,3)
-plot(t_orbit, rad2deg(TSX_oe(:,3))); grid on;
-xlabel('Orbits'); ylabel('i [deg]')
-title('Inclination')
-
-subplot(3,2,4)
-plot(t_orbit, rad2deg(TSX_oe(:,4))); grid on;
-xlabel('Orbits'); ylabel('\Omega [deg]')
-title('RAAN')
-
-subplot(3,2,5)
-plot(t_orbit, rad2deg(TSX_oe(:,5))); grid on;
-xlabel('Orbits'); ylabel('\omega [deg]')
-title('Argument of perigee')
-
-subplot(3,2,6)
-plot(t_orbit, rad2deg(TSX_oe(:,6))); grid on;
-xlabel('Orbits'); ylabel('M [deg]')
-title('Mean anomaly')
-
-figure;
-subplot(3,2,1)
-plot(t_orbit, TDX_oe(:,1)); grid on;
-xlabel('Orbits'); ylabel('a [m]')
-title('Semi–major axis')
-
-subplot(3,2,2)
-plot(t_orbit, TDX_oe(:,2)); grid on;
-xlabel('Orbits'); ylabel('e')
-title('Eccentricity')
-
-subplot(3,2,3)
-plot(t_orbit, rad2deg(TDX_oe(:,3))); grid on;
-xlabel('Orbits'); ylabel('i [deg]')
-title('Inclination')
-
-subplot(3,2,4)
-plot(t_orbit, rad2deg(TDX_oe(:,4))); grid on;
-xlabel('Orbits'); ylabel('\Omega [deg]')
-title('RAAN')
-
-subplot(3,2,5)
-plot(t_orbit, rad2deg(TDX_oe(:,5))); grid on;
-xlabel('Orbits'); ylabel('\omega [deg]')
-title('Argument of perigee')
-
-subplot(3,2,6)
-plot(t_orbit, rad2deg(TDX_oe(:,6))); grid on;
-xlabel('Orbits'); ylabel('M [deg]')
-title('Mean anomaly')
-title("TSX Orbital Elements");
-
 % --------------------------
 % Filtered state propagation
 % --------------------------
+
+%Lyapunov parameters and thrust limit
+k     = 1e3;      % Lyapunov scaling
+N_ip  = 14;       % in-plane exponent
+N_oop = 14;       % out-of-plane exponent
+u_max = 1e-4;     % maximum thrust accel (m/s^2)
 
 state_out_filt = zeros(num_points, 12);
 state_out_filt(1,:) = rel_state_init';
@@ -522,8 +453,8 @@ for idx = 2:num_points
     delta_cur_filt = [rel_oe_cur_filt(1), rel_oe_cur_filt(3:6), 0]./a_cur_filt;
 
     [A_c_filt, B_c_filt] = plant_reduced_qns(TSX_oe_cur_filt);
-    A5_filt = A_c(1:5,1:5);
-    B5_filt = B_c(1:5,:);
+    A5_filt = A_c_filt(1:5,1:5);
+    B5_filt = B_c_filt(1:5,:);
 
     Delta5_filt = delta_cur_filt(1:5) - delta_nom(1:5);
 
@@ -579,8 +510,8 @@ for idx = 2:num_points
     P_kk1 = F * P_k1k1 * F.' + Q_roe;
     P_TSX_kk1 = P_TSX_k1k1 + Pdot_TSX_kk1 .* dt;
 
-    resid = rel_oe(idx,:)'+(sqrtm(sigma_roe_meas) * randn(6, 1)) - x_kk1;
-    resid_TSX = TSX_ECI_hist(idx,:)'+(sqrtm(sigma_rv) * randn(6, 1)) - TSX_x_kk1;
+    resid = rel_oe(idx,:)'+ noise_roe(idx,:)' - x_kk1;
+    resid_TSX = TSX_ECI_hist(idx,:)'+noise_TSX(idx,:)' - TSX_x_kk1;
     resid_prefit(idx,:) = resid';
     resid_TSX_prefit(idx,:) = resid_TSX';
 
@@ -603,8 +534,8 @@ for idx = 2:num_points
     P_hist(idx, :,:) = P_kk;
     P_TSX_hist(idx, :,:) = P_TSX_kk;
 
-    resid_postfit(idx,:) = rel_oe(idx,:)+(sqrtm(sigma_roe_meas) * randn(6, 1))' - x_kk';
-    resid_TSX_postfit(idx,:) = TSX_ECI_hist(idx,:)+(sqrtm(sigma_rv) * randn(6, 1))' - TSX_x_kk';
+    resid_postfit(idx,:) = rel_oe(idx,:)+noise_roe(idx,:) - x_kk';
+    resid_TSX_postfit(idx,:) = TSX_ECI_hist(idx,:)+noise_TSX(idx,:) - TSX_x_kk';
 
     nu  = resid_prefit(idx,:)';      % innovation r_k
     NIS(idx)  = nu.' / S * nu;       % χ²(6) should lie in [1.6,14.4] 95 %
@@ -741,8 +672,8 @@ for idx = 1:6
     h_err = plot(t_orbit, err);               % error
     h1    = plot(t_orbit, +sigma1, 'r--');          % +1σ
     plot(   t_orbit, -sigma1, 'r--');
-    h2    = plot(t_orbit, +sigma3,'m--');           % +2σ
-    plot(   t_orbit, -sigma3,'m--');              % –2σ
+    h2    = plot(t_orbit, +sigma3,'m--');           % +3σ
+    plot(   t_orbit, -sigma3,'m--');              % –3σ
     
     ylabel([state_labels_error{idx}]);
     if idx>4, xlabel('Orbit #'); end
@@ -810,3 +741,103 @@ avg_NEES = mean(NEES);
 
 % Print it
 fprintf('\nAverage NEES over all steps: %8.3e\n', avg_NEES);
+
+%Plotting
+% --- RTN frame plots ---
+% TR projection
+figure;
+subplot(1,3,1);
+plot(state_out_filt(:,2), state_out_filt(:,1));
+xlabel('T [m]');
+ylabel('R [m]');
+grid on;
+axis equal;
+
+% NR projection
+subplot(1,3,2);
+plot(state_out_filt(:,3), state_out_filt(:,1));
+xlabel('N [m]');
+ylabel('R [m]');
+grid on;
+axis equal;
+
+% TN projection
+subplot(1,3,3);
+plot(state_out_filt(:,2), state_out_filt(:,3));
+xlabel('T [m]');
+ylabel('N [m]');
+grid on;
+axis equal;
+
+% 3D RTN trajectory
+figure;
+plot3(state_out_filt(:,1), state_out_filt(:,2), state_out_filt(:,3));
+xlabel('R [m]');
+ylabel('T [m]');
+zlabel('N [m]');
+grid on;
+axis equal;
+
+% --- 2D relative‐element scatter for control visualization ---
+figure;
+% Δλ vs Δa
+subplot(1,3,1);
+plot(rel_oe_filt(:,2), rel_oe_filt(:,1), 'LineWidth',1.2);
+xlabel('a\delta\lambda [m]');
+ylabel('a\deltaa [m]');
+grid on;
+axis equal;
+% Δe_x vs Δe_y
+subplot(1,3,2);
+plot(rel_oe_filt(:,3), rel_oe_filt(:,4), 'LineWidth',1.2);
+xlabel('a\deltae_x [m]');
+ylabel('a\deltae_y [m]');
+grid on;
+axis equal;
+% Δi_x vs Δi_y
+subplot(1,3,3);
+plot(rel_oe_filt(:,5), rel_oe_filt(:,6), 'LineWidth',1.2);
+xlabel('a\deltai_x [m]');
+ylabel('a\deltai_y [m]');
+grid on;
+axis equal;
+
+% 8) Plot control acceleration level
+figure;
+plot(t_orbit, a_hist_filt);
+xlabel('Orbit Number'); ylabel('Acceleration magnitude (m/s^2)');
+%title('Control Acceleration Level');
+
+% assume phi_hist and a_hist are both (N×1)
+phi_filt = wrapTo2Pi(phi_hist_filt);
+a_filt   = a_hist_filt;
+
+% find where φ jumps backwards by more than π
+dphi_filt = diff(phi_filt);
+wrapIdx = find(dphi_filt < -pi);
+
+% break the line at each wrap
+for k = 1:numel(wrapIdx)
+  i = wrapIdx(k)+1;      % index of the wrapped point
+  phi_filt(i) = NaN;
+  a_filt(i)   = NaN;
+end
+
+% now plot without the wrap‐around line
+figure
+plot(phi_filt, a);
+xlabel('Argument of Latitude \phi (rad)')
+ylabel('Acceleration magnitude (m/s^2)')
+%title('Control vs Argument of Latitude (no wrap)')
+grid on
+
+% cumulative delta-v
+dv_mag_filt  = sqrt( dv_hist_filt(1,:).^2 + dv_hist_filt(2,:).^2 + dv_hist_filt(3,:).^2 );
+cum_dv_filt   = cumsum( dv_mag_filt );
+total_dv_filt = cum_dv_filt(end);
+fprintf('Total Δv = %.3f m/s\n', total_dv_filt);
+figure;
+total_dv = sum(cum_dv_filt);
+plot(t_orbit, cum_dv_filt);
+xlabel('Orbit Number'); ylabel('Cumulative Delta-v (m/s)');
+%title('Cumulative Delta-v');
