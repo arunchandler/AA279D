@@ -29,23 +29,16 @@ roe_tgt = [0;0;
 
 %% ---------- grids & limits ----------
 n  = sqrt(mu/a_TSX^3);     T = 2*pi/n;
-sim_days  = 1;
+sim_days  = 1.5;
 t_grid    = linspace(0,sim_days*s_d,1e4+1).';   % 10 000 samples
 dt        = t_grid(2)-t_grid(1);
 
 a_chief   = a_TSX;
-de_max_m  = 2;             di_max_m = 2;
+de_max_m  = 10;             di_max_m = 2;
 de_max    = de_max_m/a_chief;
 di_max    = di_max_m/a_chief;
 e_nom_hat = roe_tgt(3:4)/a_chief;
 i_nom_hat = roe_tgt(5:6)/a_chief;
-
-delta_t = T;
-eta = sqrt(1-e_TSX^2);
-gamma = 0.5*J2*(Re/a_chief)^2/eta^4;
-
-de_max_m = 0.75*n*gamma*a_chief*e_nom_hat*delta_t*(5*cos(i_TSX))
-
 
 i_c       = i_TSX;
 lambda_nom_hat = roe_tgt(2)/a_chief;
@@ -137,18 +130,16 @@ for k = 2:N
     end
 
     %-------------------------------------------------- 4. plan new manoeuvre?
-    if isempty(pending) 
+    if isempty(pending) && (t_cur-last_plan)>=cooldown
         roe_hat = compute_roes(chief,dep)';
         de_hat  = vcol(roe_hat(3:4));   di_hat = vcol(roe_hat(5:6));
         de_err  = norm(de_hat-e_nom_hat);
         di_err  = norm(di_hat-i_nom_hat);
     
         % Add small tolerance to avoid floating point issues
-        eps_e  = 0.1*de_max;
-        eps_i  = 0.1*di_max;
-        need_e_maneuver = de_err > de_max + eps_e;
-        need_i_maneuver = di_err > di_max + eps_i;
-
+        tol_maneuver = 1e-10;  % Much smaller than the error thresholds
+        need_e_maneuver = de_err > (de_max + tol_maneuver);
+        need_i_maneuver = di_err > (di_max + tol_maneuver);
     
         if need_e_maneuver || need_i_maneuver
             fprintf('\n=== Maneuver Planning Debug ===\n');
@@ -185,30 +176,17 @@ for k = 2:N
                 % burn epochs
                 uM1  = wrapTo2Pi(atan2(de_req(2),de_req(1)));
                 uM2  = wrapTo2Pi(uM1+pi);
-
-
                 t1   = next_burn(uM1,u_c,t_cur,nbar);
                 t2   = next_burn(uM2,u_c,t_cur,nbar);
             
                 % Δv magnitudes - simplified Damico maneuver
                 dvt1 = n*a_chief/2 * de_max;
                 dvt2 = -dvt1;  % Opposite burn for eccentricity control
-
-                % if t2 < t1                      % make sure T1 is always the first burn
-                %     [t1,t2]   = deal(t2,t1);
-                %     [dvt1,dvt2]= deal(dvt2,dvt1);
-                % end
-                                
+                
                 % Add numerical bounds checking
-                % max_dv = 0.1;  % Maximum 10 cm/s per burn
-                % nu_d = mean2true(dep(6),dep(2),tol);
-                % u_d  = wrap(nu_d+dep(5));
-                % delta_u = wrapToPi(u_d-u_c);Delta_t = 1*T;
-                % du_J2 = -12*gamma*sin(2*chief(3))*di_hat(1)*n*Delta_t;
-                % da_man = -pi/(2*n*Delta_t-pi) * ...
-                %           (3*de_max+roe_hat(1) - (4/(3*pi))*(delta_u-u_nom_hat+du_J2));
-                % dvt1 = n*a_chief/4*((da_man-roe_hat(1))+norm(de_req));
-                % dvt2 = -dvt1;
+                max_dv = 0.1;  % Maximum 10 cm/s per burn
+                dvt1 = sign(dvt1) * min(abs(dvt1), max_dv);
+                dvt2 = sign(dvt2) * min(abs(dvt2), max_dv);
             
                 % Store RTN components for later conversion at burn time
                 new_burns = [new_burns;
@@ -284,19 +262,109 @@ fprintf('\nTotal manoeuvres planned: %d\n',numel(maneuver_log));
 fprintf('Total Δv = %.3f m/s   (%.3f m/s per day)\n',...
         cum_dv, cum_dv/sim_days);
 
-% ---- ROE evolution (each in its own axis) ----
+% ---- ROE evolution (x-axis in orbits) ----
 figure('Name','ROE evolution','Color','w');
 labels = {'a·δa [m]','a·δλ [m]','a·δe_x [m]','a·δe_y [m]',...
           'a·δi_x [m]','a·δi_y [m]'};
+t_orbits = t_grid / T;  % Convert time to orbits
 for i = 1:6
     subplot(3,2,i)
-    plot(t_grid/86400,rel(:,i),'LineWidth',1.2);
+    plot(t_orbits, rel(:,i), 'LineWidth', 1.2);
     ylabel(labels{i}); grid on
-    if i==1, title('Relative Orbital Elements vs time'); end
-    if i>4,  xlabel('Time [day]'); end
+    if i>4,  xlabel('Orbits'); end
 end
 
-% ---- cumulative Δv ----
+% ---- RTN relative motion ----
+figure('Name','RTN Relative Motion','Color','w');
+
+% First, compute RTN positions for all time steps
+rtn_pos = zeros(N, 3);
+for k = 1:N
+    % Get position and velocity for both spacecraft
+    rv_chief = oe2rv(TSX(k,:), mu);
+    rv_deputy = oe2rv(TDX(k,:), mu);
+    
+    % Compute relative position in ECI
+    dr_eci = rv_deputy(1:3) - rv_chief(1:3);
+    
+    % Transform to RTN frame
+    [R_hat, T_hat, N_hat] = eci2rtn_dir(rv_chief(1:3), rv_chief(4:6));
+    Q_ECI2RTN = [R_hat(:), T_hat(:), N_hat(:)]';
+    dr_rtn = Q_ECI2RTN * dr_eci;
+    
+    rtn_pos(k,:) = dr_rtn';
+end
+
+% Create segments based on maneuvers (for different colors)
+burn_indices = zeros(size(burn_t));
+for i = 1:length(burn_t)
+    [~, burn_indices(i)] = min(abs(t_grid - burn_t(i)));
+end
+
+% Add start and end indices
+segment_indices = [1; burn_indices; N];
+nSeg = length(segment_indices) - 1;
+
+% Generate colors for segments
+colors = lines(nSeg);
+legend_labels = cell(nSeg, 1);
+for i = 1:nSeg
+    if i == 1
+        legend_labels{i} = 'Initial';
+    else
+        legend_labels{i} = sprintf('After burn %d', i-1);
+    end
+end
+
+% TR plane: T on x, R on y
+subplot(1,3,1); hold on;
+for s = 1:nSeg
+    segStart = segment_indices(s);
+    segEnd = segment_indices(s+1);
+    if segStart < segEnd
+        seg = segStart:segEnd;
+        plot(rtn_pos(seg,2), rtn_pos(seg,1), 'Color', colors(s,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('T [m]'); ylabel('R [m]');
+title('TR plane');
+if nSeg > 1
+    legend(legend_labels, 'Location', 'best', 'FontSize', 8);
+end
+
+% NR plane: N on x, R on y
+subplot(1,3,2); hold on;
+for s = 1:nSeg
+    segStart = segment_indices(s);
+    segEnd = segment_indices(s+1);
+    if segStart < segEnd
+        seg = segStart:segEnd;
+        plot(rtn_pos(seg,3), rtn_pos(seg,1), 'Color', colors(s,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('N [m]'); ylabel('R [m]');
+title('RTN: NR plane');
+
+% TN plane: T on x, N on y
+subplot(1,3,3); hold on;
+for s = 1:nSeg
+    segStart = segment_indices(s);
+    segEnd = segment_indices(s+1);
+    if segStart < segEnd
+        seg = segStart:segEnd;
+        plot(rtn_pos(seg,2), rtn_pos(seg,3), 'Color', colors(s,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('T [m]'); ylabel('N [m]');
+title('RTN: TN plane');
+
+% ---- cumulative Δv (keep x-axis in days) ----
 cum_hist = zeros(N,1);
 for i = 1:N
     cum_hist(i) = sum(burn_dv(burn_t<=t_grid(i)));
@@ -305,24 +373,6 @@ figure('Name','Cumulative Δv','Color','w');
 plot(t_grid/86400,cum_hist,'LineWidth',1.6); grid on
 ylabel('ΣΔv  [m/s]'); xlabel('Time [day]');
 title('Total Δv consumption');
-
-% Show maneuver details
-if ~isempty(maneuver_log)
-    fprintf('\n=== MANEUVER DETAILS ===\n');
-    fprintf('%-8s %-12s %-12s %-12s %-12s\n', 'Maneuver', 'Orbit', 'de_error', 'di_error', 'Total_dV');
-    fprintf('%-8s %-12s %-12s %-12s %-12s\n', '-------', '-----', '--------', '--------', '--------');
-    
-    for i = 1:length(maneuver_log)
-        det = maneuver_log(i);
-        orbit_num = det.t_det / T;
-        total_dv = abs(det.dvt1) + abs(det.dvt2);
-        if isfield(det, 'dvn')
-            total_dv = total_dv + det.dvn;
-        end
-        fprintf('%-8d %-12.2f %-12.2f %-12.2f %-12.4f\n', ...
-                i, orbit_num, det.de_error, det.di_error, total_dv);
-    end
-end
 
 %% Helper Functions
 
@@ -333,7 +383,6 @@ function t_burn = find_next_burn_time(u_tgt, u_now, t_now, nbar)
     t_burn = -100;
     
     while t_burn < t_now
-        
         u_target = u_tgt + k*2*pi;  % Add full revolutions to find next occurrence
         t_burn = t_now + (u_target - u_now)/nbar;
         k = k + 1;

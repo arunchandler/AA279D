@@ -262,45 +262,117 @@ fprintf('\nTotal manoeuvres planned: %d\n',numel(maneuver_log));
 fprintf('Total Δv = %.3f m/s   (%.3f m/s per day)\n',...
         cum_dv, cum_dv/sim_days);
 
-% ---- ROE evolution (each in its own axis) ----
+% ---- ROE evolution (x-axis in orbits) ----
 figure('Name','ROE evolution','Color','w');
 labels = {'a·δa [m]','a·δλ [m]','a·δe_x [m]','a·δe_y [m]',...
           'a·δi_x [m]','a·δi_y [m]'};
+t_orbits = t_grid / T;  % Convert time to orbits
 for i = 1:6
     subplot(3,2,i)
-    plot(t_grid/86400,rel(:,i),'LineWidth',1.2);
+    plot(t_orbits, rel(:,i), 'LineWidth', 1.2);
     ylabel(labels{i}); grid on
-    if i==1, title('Relative Orbital Elements vs time'); end
-    if i>4,  xlabel('Time [day]'); end
+    if i>4,  xlabel('Orbits'); end
 end
 
-% ---- cumulative Δv ----
+% ---- RTN relative motion ----
+figure('Name','RTN Relative Motion','Color','w');
+
+% First, compute RTN positions for all time steps
+rtn_pos = zeros(N, 3);
+for k = 1:N
+    % Get position and velocity for both spacecraft
+    rv_chief = oe2rv(TSX(k,:), mu);
+    rv_deputy = oe2rv(TDX(k,:), mu);
+    
+    % Compute relative position in ECI
+    dr_eci = rv_deputy(1:3) - rv_chief(1:3);
+    
+    % Transform to RTN frame
+    [R_hat, T_hat, N_hat] = eci2rtn_dir(rv_chief(1:3), rv_chief(4:6));
+    Q_ECI2RTN = [R_hat(:), T_hat(:), N_hat(:)]';
+    dr_rtn = Q_ECI2RTN * dr_eci;
+    
+    rtn_pos(k,:) = dr_rtn';
+end
+
+% Create segments based on maneuvers (for different colors)
+burn_indices = zeros(size(burn_t));
+for i = 1:length(burn_t)
+    [~, burn_indices(i)] = min(abs(t_grid - burn_t(i)));
+end
+
+% Add start and end indices
+segment_indices = [1; burn_indices; N];
+nSeg = length(segment_indices) - 1;
+
+% Generate colors for segments
+colors = lines(nSeg);
+legend_labels = cell(nSeg, 1);
+for i = 1:nSeg
+    if i == 1
+        legend_labels{i} = 'Initial';
+    else
+        legend_labels{i} = sprintf('After burn %d', i-1);
+    end
+end
+
+% TR plane: T on x, R on y
+subplot(1,3,1); hold on;
+for s = 1:nSeg
+    segStart = segment_indices(s);
+    segEnd = segment_indices(s+1);
+    if segStart < segEnd
+        seg = segStart:segEnd;
+        plot(rtn_pos(seg,2), rtn_pos(seg,1), 'Color', colors(s,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('T [m]'); ylabel('R [m]');
+title('TR plane');
+if nSeg > 1
+    legend(legend_labels, 'Location', 'best', 'FontSize', 8);
+end
+
+% NR plane: N on x, R on y
+subplot(1,3,2); hold on;
+for s = 1:nSeg
+    segStart = segment_indices(s);
+    segEnd = segment_indices(s+1);
+    if segStart < segEnd
+        seg = segStart:segEnd;
+        plot(rtn_pos(seg,3), rtn_pos(seg,1), 'Color', colors(s,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('N [m]'); ylabel('R [m]');
+title('NR plane');
+
+% TN plane: T on x, N on y
+subplot(1,3,3); hold on;
+for s = 1:nSeg
+    segStart = segment_indices(s);
+    segEnd = segment_indices(s+1);
+    if segStart < segEnd
+        seg = segStart:segEnd;
+        plot(rtn_pos(seg,2), rtn_pos(seg,3), 'Color', colors(s,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('T [m]'); ylabel('N [m]');
+title('TN plane');
+
+% ---- cumulative Δv (keep x-axis in days) ----
 cum_hist = zeros(N,1);
 for i = 1:N
     cum_hist(i) = sum(burn_dv(burn_t<=t_grid(i)));
 end
 figure('Name','Cumulative Δv','Color','w');
-plot(t_grid/86400,cum_hist,'LineWidth',1.6); grid on
-ylabel('ΣΔv  [m/s]'); xlabel('Time [day]');
-title('Total Δv consumption');
+plot(t_orbits,cum_hist,'LineWidth',1.6); grid on
+ylabel('ΣΔv  [m/s]'); xlabel('Orbits');
 
-% Show maneuver details
-if ~isempty(maneuver_log)
-    fprintf('\n=== MANEUVER DETAILS ===\n');
-    fprintf('%-8s %-12s %-12s %-12s %-12s\n', 'Maneuver', 'Orbit', 'de_error', 'di_error', 'Total_dV');
-    fprintf('%-8s %-12s %-12s %-12s %-12s\n', '-------', '-----', '--------', '--------', '--------');
-    
-    for i = 1:length(maneuver_log)
-        det = maneuver_log(i);
-        orbit_num = det.t_det / T;
-        total_dv = abs(det.dvt1) + abs(det.dvt2);
-        if isfield(det, 'dvn')
-            total_dv = total_dv + det.dvn;
-        end
-        fprintf('%-8d %-12.2f %-12.2f %-12.2f %-12.4f\n', ...
-                i, orbit_num, det.de_error, det.di_error, total_dv);
-    end
-end
 
 %% Helper Functions
 

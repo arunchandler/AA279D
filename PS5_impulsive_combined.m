@@ -42,14 +42,20 @@ switch scenario
     case 2
         % Single reconfiguration
         phases = [struct('type', 'keeping', ...
-                        'start_time', 0, ...
-                        'duration', 0.5*s_d, ...
-                        'qns', [0, 0, 0, 300, 0, 400]);
-                 struct('type', 'reconfig', ...
-                        'start_time', 0.5*s_d, ...
-                        'duration', 0.1*s_d, ...
-                        'qns', [0, 0, 0, 300, 0, 500])];
-        sim_days = 1;
+                       'start_time', 0, ...
+                       'duration', 0.5*s_d, ...
+                       'qns', [0, 0, 0, 300, 0, 400]);
+                struct('type', 'reconfig', ...
+                       'start_time', 0.5*s_d, ...
+                       'duration', 0.1*s_d, ...
+                       'qns', [0, 0, 0, 300, 0, 500])
+                 struct('type', 'keeping', ...
+                       'start_time', 0.7*s_d, ...
+                       'duration', 0.5*s_d, ...
+                       'qns', [0, 0, 0, 300, 0, 500]);     
+                       ];
+       sim_days = 1.2;
+
         
     case 3
         % Multiple reconfigurations
@@ -81,7 +87,7 @@ initial_qns = phases(1).qns;
 [TDX_init,~] = safe_qns2oe(TSX_init, initial_qns');
 
 %% ---------- formation keeping parameters ----------
-de_max_m = 10;             % Maximum eccentricity error [m] - back to original values
+de_max_m = 2;             % Maximum eccentricity error [m] - back to original values
 di_max_m = 2;              % Maximum inclination error [m] - back to original values
 de_max = de_max_m/a_TSX;
 di_max = di_max_m/a_TSX;
@@ -253,70 +259,211 @@ fprintf('Reconfiguration burns: %d\n', n_reconfig);
 
 %% ---------- PLOTS ----------
 
-% ROE evolution
+% ROE evolution with orbit numbers on x-axis
 figure('Name', 'ROE Evolution');
 labels = {'a·δa [m]','a·δλ [m]','a·δe_x [m]','a·δe_y [m]',...
           'a·δi_x [m]','a·δi_y [m]'};
 colors = lines(length(phases));
 
+% Convert time to orbits
+t_orbits = t_grid / T;
+
 for i = 1:6
     subplot(3,2,i)
-    plot(t_grid/3600, rel(:,i), 'LineWidth', 1.2);
+    plot(t_orbits, rel(:,i), 'LineWidth', 1.2);
     hold on
     
     % Plot phase boundaries and targets
     for p = 1:length(phases)
-        t_start = phases(p).start_time / 3600;
-        t_end = (phases(p).start_time + phases(p).duration) / 3600;
+        t_start_orbits = phases(p).start_time / T;
+        t_end_orbits = (phases(p).start_time + phases(p).duration) / T;
         yval = phases(p).qns(i);
         
-        plot([t_start t_end], [yval yval], '--', ...
+        plot([t_start_orbits t_end_orbits], [yval yval], '--', ...
              'Color', colors(p,:), 'LineWidth', 1.5);
         
         if p < length(phases)
-            plot([t_end t_end], [yval phases(p+1).qns(i)], 'k:', 'LineWidth', 1);
+            plot([t_end_orbits t_end_orbits], [yval phases(p+1).qns(i)], 'k:', 'LineWidth', 1);
         end
     end
     
     ylabel(labels{i}); 
     grid on
-    if i == 1
-        title('Relative Orbital Elements vs Time');
-    end
     if i > 4
-        xlabel('Time [hours]');
+        xlabel('Orbits');
     end
 end
 
-% Maneuver timeline
+% RTN relative motion plot
+figure('Name','RTN Relative Motion','Color','w');
+
+% First, compute RTN positions for all time steps
+rtn_pos = zeros(N, 3);
+for k = 1:N
+    % Get position and velocity for both spacecraft
+    rv_chief = oe2rv(TSX(k,:), mu);
+    rv_deputy = oe2rv(TDX(k,:), mu);
+    
+    % Compute relative position in ECI
+    dr_eci = rv_deputy(1:3) - rv_chief(1:3);
+    
+    % Transform to RTN frame
+    [R_hat, T_hat, N_hat] = eci2rtn_dir(rv_chief(1:3), rv_chief(4:6));
+    Q_ECI2RTN = [R_hat(:), T_hat(:), N_hat(:)]';
+    dr_rtn = Q_ECI2RTN * dr_eci;
+    
+    rtn_pos(k,:) = dr_rtn';
+end
+
+% Create segments based on phases for different colors
+phase_indices = zeros(N, 1);
+for k = 1:N
+    for p = 1:length(phases)
+        if t_grid(k) >= phases(p).start_time && ...
+           t_grid(k) < phases(p).start_time + phases(p).duration
+            phase_indices(k) = p;
+            break;
+        end
+    end
+end
+
+% Generate colors for phases
+phase_colors = lines(length(phases));
+legend_labels = cell(length(phases), 1);
+for p = 1:length(phases)
+    if strcmp(phases(p).type, 'keeping')
+        legend_labels{p} = sprintf('Keeping (Phase %d)', p);
+    else
+        legend_labels{p} = sprintf('Reconfig (Phase %d)', p);
+    end
+end
+
+% TR plane: T on x, R on y
+subplot(1,3,1); hold on;
+for p = 1:length(phases)
+    idx = find(phase_indices == p);
+    if ~isempty(idx)
+        plot(rtn_pos(idx,2), rtn_pos(idx,1), 'Color', phase_colors(p,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('T [m]'); ylabel('R [m]');
+legend(legend_labels, 'Location', 'best', 'FontSize', 8);
+
+% NR plane: N on x, R on y
+subplot(1,3,2); hold on;
+for p = 1:length(phases)
+    idx = find(phase_indices == p);
+    if ~isempty(idx)
+        plot(rtn_pos(idx,3), rtn_pos(idx,1), 'Color', phase_colors(p,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('N [m]'); ylabel('R [m]');
+
+% TN plane: T on x, N on y
+subplot(1,3,3); hold on;
+for p = 1:length(phases)
+    idx = find(phase_indices == p);
+    if ~isempty(idx)
+        plot(rtn_pos(idx,2), rtn_pos(idx,3), 'Color', phase_colors(p,:), 'LineWidth', 1.2);
+    end
+end
+hold off;
+axis equal; grid on;
+xlabel('T [m]'); ylabel('N [m]');
+
+
+% Maneuver timeline with orbits on x-axis
 figure('Name', 'Maneuver Timeline');
+burn_t_orbits = burn_t / T;  % Convert burn times to orbits
+
 subplot(3,1,1)
 idx_keep = strcmp(burn_types, 'keeping');
 idx_reconfig = strcmp(burn_types, 'reconfig');
-stem(burn_t(idx_keep)/3600, burn_vecs(idx_keep,1)*1000, 'b', 'LineWidth', 1.5);
+stem(burn_t_orbits(idx_keep), burn_vecs(idx_keep,1)*1000, 'b', 'LineWidth', 1.5);
 hold on
-stem(burn_t(idx_reconfig)/3600, burn_vecs(idx_reconfig,1)*1000, 'r', 'LineWidth', 1.5);
+stem(burn_t_orbits(idx_reconfig), burn_vecs(idx_reconfig,1)*1000, 'r', 'LineWidth', 1.5);
 ylabel('δv_R [mm/s]'); 
 grid on
-title('Radial Burns');
 legend('Keeping', 'Reconfig', 'Location', 'best');
 
 subplot(3,1,2)
-stem(burn_t(idx_keep)/3600, burn_vecs(idx_keep,2)*1000, 'b', 'LineWidth', 1.5);
+stem(burn_t_orbits(idx_keep), burn_vecs(idx_keep,2)*1000, 'b', 'LineWidth', 1.5);
 hold on
-stem(burn_t(idx_reconfig)/3600, burn_vecs(idx_reconfig,2)*1000, 'r', 'LineWidth', 1.5);
+stem(burn_t_orbits(idx_reconfig), burn_vecs(idx_reconfig,2)*1000, 'r', 'LineWidth', 1.5);
 ylabel('δv_T [mm/s]'); 
 grid on
-title('Tangential Burns');
+
 
 subplot(3,1,3)
-stem(burn_t(idx_keep)/3600, burn_vecs(idx_keep,3)*1000, 'b', 'LineWidth', 1.5);
+stem(burn_t_orbits(idx_keep), burn_vecs(idx_keep,3)*1000, 'b', 'LineWidth', 1.5);
 hold on
-stem(burn_t(idx_reconfig)/3600, burn_vecs(idx_reconfig,3)*1000, 'r', 'LineWidth', 1.5);
+stem(burn_t_orbits(idx_reconfig), burn_vecs(idx_reconfig,3)*1000, 'r', 'LineWidth', 1.5);
 ylabel('δv_N [mm/s]'); 
-xlabel('Time [hours]');
+xlabel('Orbits');
 grid on
-title('Normal Burns');
+
+
+% Cumulative Δv with orbits on x-axis
+figure('Name', 'Cumulative Δv');
+cum_hist = zeros(N,1);
+for i = 1:N
+    cum_hist(i) = sum(burn_dv(burn_t <= t_grid(i)));
+end
+plot(t_orbits, cum_hist*1000, 'LineWidth', 1.6);
+grid on
+ylabel('Cumulative Δv [mm/s]');
+xlabel('Orbits');
+
+
+% Add phase boundaries
+hold on
+for p = 2:length(phases)
+    t_phase_orbits = phases(p).start_time / T;
+    plot([t_phase_orbits t_phase_orbits], ylim, 'k--', 'LineWidth', 1);
+end
+
+% Optional: Add a zoom plot for the reconfiguration
+if scenario >= 2  % If there's a reconfiguration
+    figure('Name', 'RTN During Reconfiguration');
+    
+    % Find indices during reconfiguration phase
+    reconfig_idx = [];
+    for p = 1:length(phases)
+        if strcmp(phases(p).type, 'reconfig')
+            t_start = phases(p).start_time;
+            t_end = phases(p).start_time + phases(p).duration;
+            reconfig_idx = [reconfig_idx; find(t_grid >= t_start & t_grid <= t_end)];
+        end
+    end
+    
+    if ~isempty(reconfig_idx)
+        % Include some before and after
+        margin = round(0.1 * T / dt);  % 0.1 orbit before and after
+        plot_idx = max(1, reconfig_idx(1)-margin):min(N, reconfig_idx(end)+margin);
+        
+        subplot(1,3,1)
+        plot(rtn_pos(plot_idx,2), rtn_pos(plot_idx,1), 'LineWidth', 2);
+        axis equal; grid on;
+        xlabel('T [m]'); ylabel('R [m]');
+
+        
+        subplot(1,3,2)
+        plot(rtn_pos(plot_idx,3), rtn_pos(plot_idx,1), 'LineWidth', 2);
+        axis equal; grid on;
+        xlabel('N [m]'); ylabel('R [m]');
+
+        
+        subplot(1,3,3)
+        plot(rtn_pos(plot_idx,2), rtn_pos(plot_idx,3), 'LineWidth', 2);
+        axis equal; grid on;
+        xlabel('T [m]'); ylabel('N [m]');
+
+    end
+end
 
 % Cumulative Δv
 figure('Name', 'Cumulative Δv');
@@ -324,11 +471,11 @@ cum_hist = zeros(N,1);
 for i = 1:N
     cum_hist(i) = sum(burn_dv(burn_t <= t_grid(i)));
 end
-plot(t_grid/3600, cum_hist*1000, 'LineWidth', 1.6);
+plot(t_orbits, cum_hist*1000, 'LineWidth', 1.6);
 grid on
 ylabel('Cumulative Δv [mm/s]');
 xlabel('Time [hours]');
-title('Total Δv Consumption');
+
 
 % Add phase boundaries
 hold on
@@ -457,7 +604,7 @@ function [burns, maneuver_log] = plan_formation_keeping(chief, dep, e_nom_hat, i
         t2 = find_next_burn_time(uM2, u_c, t_cur, nbar);
         
         % Δv magnitudes - simplified Damico maneuver (like PS5_Analytical.m)
-        dvt1 = n*a_chief/4 * norm(de_req);
+        dvt1 = n*a_chief/2 * de_max;
         dvt2 = -dvt1;  % Opposite burn for eccentricity control
         
         % Add numerical bounds checking (like PS5_Analytical.m)
