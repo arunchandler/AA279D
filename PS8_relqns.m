@@ -66,7 +66,7 @@ sigma_rv = diag([sigma_pos^2*ones(3,1);
 
 sigma_roe_init = diag([sigma_qns_a^2, sigma_qns_lam^2, sigma_qns_e^2, sigma_qns_e^2, sigma_qns_i^2, sigma_qns_i^2]);
 
-sigma_roe_meas = diag([0.5^2 5^2 1^2 1^2 0.5^2 0.5^2]); 
+sigma_roe_meas = diag([0.5^2 5^2 1^2 1^2 0.5^2 0.5^2]);
 
 N = length(t_grid);
 
@@ -97,7 +97,6 @@ Q = P0/10;
 R      = diag([2^2*ones(3,1); (0.02)^2*ones(3,1)]);  % absolute GPS
 
 % process noise (ROE)
-
 n   = sqrt(mu/a_TSX_init^3);
 sigma_a_t = 2.5e-4;                      % 40 µm/s²  ← tuned
 Q_roe = 100*(sigma_a_t^2 / n^2) * diag([4 4 2 2 1 1]) * dt;
@@ -176,7 +175,7 @@ for idx = 2:num_points
     % ROE STM propagation ---------
     F = stm_qns_j2(dt, TSX_oe);
     x_kk1 = F * x_k1k1;
-    % ---------------------------------------
+    % -----------------------------
 
     % TSX ode propagation ----------
     [~, TSX_x_kk1] = ode4(@compute_rates_rv_perturbed, [t,t_next]', TSX_x_k1k1, dt);
@@ -203,7 +202,6 @@ for idx = 2:num_points
     S_TSX = H * P_TSX_kk1 * H.' + R;
 
     K = P_kk1 * H.' * inv(S);
-    %disp(diag(K));
     K_TSX = P_TSX_kk1 * H.' * inv(S_TSX);
     
     x_kk = x_kk1 + K * y;

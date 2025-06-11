@@ -80,6 +80,7 @@ function params = rv2oe(X, mu)
 
     % build output
     h_pf = h_vec;                              % [h_x h_y h_z]
+    h_pf = reshape(h_pf,[1,3]);
     e_pf = [e*cos(omega), e*sin(omega)];         % eccentricity in perifocal
 
     params = [a, e, i, RAAN, omega, nu, energy, h_pf, e_pf];
