@@ -29,7 +29,7 @@ roe_tgt = [0;0;
 
 %% ---------- grids & limits ----------
 n  = sqrt(mu/a_TSX^3);     T = 2*pi/n;
-sim_days  = 2;
+sim_days  = 1.5;
 t_grid    = linspace(0,sim_days*s_d,1e4+1).';   % 10 000 samples
 dt        = t_grid(2)-t_grid(1);
 
@@ -180,7 +180,7 @@ for k = 2:N
                 t2   = next_burn(uM2,u_c,t_cur,nbar);
             
                 % Δv magnitudes - simplified Damico maneuver
-                dvt1 = n*a_chief/4 * norm(de_req);
+                dvt1 = n*a_chief/2 * de_max;
                 dvt2 = -dvt1;  % Opposite burn for eccentricity control
                 
                 % Add numerical bounds checking
